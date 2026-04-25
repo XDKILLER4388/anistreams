@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AniStream — Anime Streaming</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">ANISTREAM</a>
+  <div class="nav-links">
+    <a href="index.html" class="active">Home</a>
+    <a href="search.html">Browse</a>
+    <a href="downloads.html">Downloads</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <form class="nav-search" action="search.html" method="get">
+      <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
+      <button type="submit">⌕</button>
+    </form>
+    <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="hero-bg" id="hero-bg"></div>
+  <div class="hero-content">
+    <div class="hero-badge">NOW TRENDING</div>
+    <h1 class="hero-title" id="hero-title">Loading...</h1>
+    <p class="hero-desc" id="hero-desc"></p>
+    <div class="hero-actions">
+      <a href="#" class="btn btn-primary hero-watch-btn" id="hero-watch-btn">▶ WATCH NOW</a>
+      <a href="search.html" class="btn btn-ghost">BROWSE ALL</a>
+    </div>
+  </div>
+</section>
+
+<!-- TRENDING -->
+<section class="section">
+  <div class="section-header">
+    <h2 class="section-title">TRENDING NOW</h2>
+    <a href="search.html" class="section-more">View All →</a>
+  </div>
+  <div class="cards-grid" id="trending-grid"></div>
+</section>
+
+<!-- THIS SEASON -->
+<section class="section" style="border-top:1px solid var(--border)">
+  <div class="section-header">
+    <h2 class="section-title">THIS SEASON</h2>
+    <a href="search.html" class="section-more">View All →</a>
+  </div>
+  <div class="cards-grid" id="season-grid"></div>
+</section>
+
+<!-- TOP ALL TIME -->
+<section class="section" style="border-top:1px solid var(--border)">
+  <div class="section-header">
+    <h2 class="section-title">TOP RATED</h2>
+    <a href="search.html" class="section-more">View All →</a>
+  </div>
+  <div class="cards-grid" id="top-grid"></div>
+</section>
+
+<footer>
+  <div class="footer-logo">ANISTREAM</div>
+  <p>Metadata provided by <a href="https://jikan.moe" target="_blank" rel="noopener" style="color:var(--text)">Jikan</a> &amp; <a href="https://anilist.co" target="_blank" rel="noopener" style="color:var(--text)">AniList</a>. All rights belong to respective owners.</p>
+</footer>
+
+<div id="toast" class="toast"></div>
+<script type="module" src="js/main.js"></script>
+<script type="module">
+import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
+injectAuthModal();
+getUser().then(u => renderNavUser(u));
+</script>
+</body>
+</html>

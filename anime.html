@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anime Details — AniStream</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .detail-bg {
+      position: fixed; inset: 0; z-index: -1;
+      background-size: cover; background-position: center;
+      filter: brightness(0.08) blur(20px);
+    }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 2rem; margin-bottom: 1.5rem; }
+    .info-item label { font-size: 0.7rem; letter-spacing: 2px; color: var(--muted); display: block; }
+    .info-item span { font-size: 0.95rem; }
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; }
+  </style>
+</head>
+<body>
+
+<div class="detail-bg" id="detail-bg"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo">ANISTREAM</a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="search.html">Browse</a>
+  </div>
+  <form class="nav-search" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
+    <button type="submit">⌕</button>
+  </form>
+  <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+</nav>
+
+<div class="detail-hero" id="detail-hero">
+  <!-- Skeleton -->
+  <div class="detail-poster">
+    <div class="skeleton" style="width:240px;height:340px"></div>
+  </div>
+  <div class="detail-info" style="flex:1">
+    <div class="skeleton" style="height:36px;width:60%;margin-bottom:1rem;border-radius:4px"></div>
+    <div class="skeleton" style="height:16px;width:40%;margin-bottom:1.5rem;border-radius:4px"></div>
+    <div class="skeleton" style="height:80px;border-radius:4px"></div>
+  </div>
+</div>
+
+<section class="section" style="border-top:1px solid var(--border)">
+  <div class="section-header">
+    <h2 class="section-title">EPISODES</h2>
+    <span id="ep-count" style="color:var(--muted);font-size:0.8rem"></span>
+  </div>
+  <div id="episodes-grid">
+    <div class="skeleton" style="height:44px;border-radius:4px"></div>
+  </div>
+</section>
+
+<section class="section" style="border-top:1px solid var(--border)">
+  <div class="section-header">
+    <h2 class="section-title">RELATED</h2>
+  </div>
+  <div class="related-grid" id="related-grid"></div>
+</section>
+
+<footer>
+  <div class="footer-logo">ANISTREAM</div>
+  <p>Metadata by <a href="https://jikan.moe" target="_blank" rel="noopener" style="color:var(--text)">Jikan</a> &amp; <a href="https://anilist.co" target="_blank" rel="noopener" style="color:var(--text)">AniList</a></p>
+</footer>
+
+<div id="toast" class="toast"></div>
+<script type="module">
+import { getAnimeById, getAnimeEpisodes, getAniListAnime } from './js/api.js';
+import { renderCard, showToast } from './js/main.js';
+import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
+injectAuthModal();
+getUser().then(u => renderNavUser(u));
+
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id');
+
+async function init() {
+  if (!id) { window.location.href = 'index.html'; return; }
+
+  try {
+    const [anime, alData] = await Promise.allSettled([
+      getAnimeById(id),
+      getAniListAnime(parseInt(id))
+    ]);
+
+    const a = anime.value;
+    const al = alData.value;
+
+    document.title = `${a.title} — AniStream`;
+
+    // Background
+    const bg = al?.bannerImage || a.images?.jpg?.large_image_url;
+    document.getElementById('detail-bg').style.backgroundImage = `url('${bg}')`;
+
+    // Hero
+    document.getElementById('detail-hero').innerHTML = `
+      <div class="detail-poster glow-pulse">
+        <img src="${a.images?.jpg?.large_image_url}" alt="${a.title}">
+      </div>
+      <div class="detail-info">
+        <h1 class="detail-title">${a.title}</h1>
+        <p class="detail-title-jp">${a.title_japanese || ''}</p>
+        <div class="detail-stats">
+          <div class="stat-item">
+            <div class="stat-value">${a.score || 'N/A'}</div>
+            <div class="stat-label">SCORE</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${a.episodes || '?'}</div>
+            <div class="stat-label">EPISODES</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${a.rank ? '#'+a.rank : 'N/A'}</div>
+            <div class="stat-label">RANK</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${a.members ? (a.members/1000).toFixed(0)+'K' : 'N/A'}</div>
+            <div class="stat-label">MEMBERS</div>
+          </div>
+        </div>
+        <div class="detail-genres">
+          ${(a.genres||[]).map(g => `<span class="genre-tag">${g.name}</span>`).join('')}
+        </div>
+        <p class="detail-synopsis">${a.synopsis || 'No synopsis available.'}</p>
+        <div class="info-grid">
+          <div class="info-item"><label>TYPE</label><span>${a.type||'—'}</span></div>
+          <div class="info-item"><label>STATUS</label><span>${a.status||'—'}</span></div>
+          <div class="info-item"><label>AIRED</label><span>${a.aired?.string||'—'}</span></div>
+          <div class="info-item"><label>STUDIO</label><span>${a.studios?.[0]?.name||'—'}</span></div>
+          <div class="info-item"><label>SOURCE</label><span>${a.source||'—'}</span></div>
+          <div class="info-item"><label>RATING</label><span>${a.rating||'—'}</span></div>
+        </div>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap">
+          <a href="watch.html?id=${id}&ep=1" class="btn btn-primary">▶ WATCH NOW</a>
+          <button class="btn btn-ghost" onclick="toggleFavorite('${id}','${a.title}','${a.images?.jpg?.large_image_url}')">♡ FAVORITE</button>
+          ${a.trailer?.youtube_id ? `<a href="https://www.youtube.com/watch?v=${a.trailer.youtube_id}" target="_blank" rel="noopener" class="btn btn-ghost">▶ TRAILER</a>` : ''}
+        </div>
+      </div>`;
+
+    // Fetch ALL episode pages from Jikan sequentially (avoids 429 rate limit)
+    const epGrid    = document.getElementById('episodes-grid');
+    const epCountEl = document.getElementById('ep-count');
+    epGrid.innerHTML = `<p style="color:var(--muted);font-size:.82rem">Loading episodes…</p>`;
+
+    let airedEps = [];
+    const todayEp = new Date(); todayEp.setHours(0,0,0,0);
+
+    async function fetchEpPage(page, retries = 3) {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}`);
+          if (res.status === 429) { await new Promise(r => setTimeout(r, 1000 + attempt * 500)); continue; }
+          return await res.json();
+        } catch(e) {
+          if (attempt === retries - 1) return null;
+          await new Promise(r => setTimeout(r, 600));
+        }
+      }
+      return null;
+    }
+
+    try {
+      const page1    = await fetchEpPage(1);
+      let allEps     = page1?.data || [];
+      const lastPage = page1?.pagination?.last_visible_page || 1;
+
+      for (let p = 2; p <= lastPage; p++) {
+        await new Promise(r => setTimeout(r, 350));
+        const data = await fetchEpPage(p);
+        if (data?.data) allEps = allEps.concat(data.data);
+      }
+
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 7);
+      const isAiring = a.status === 'Currently Airing';
+      const epMap = {};
+      allEps.forEach(e => { if (!e.aired || new Date(e.aired) <= cutoff) epMap[e.mal_id] = e.title || null; });
+
+      if (isAiring && a.episodes > 0) {
+        // Airing: show all episodes up to total, Jikan titles where available
+        airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
+      } else {
+        airedEps = allEps
+          .filter(e => !e.aired || new Date(e.aired) <= cutoff)
+          .map(e => e.mal_id);
+        // Finished but Jikan list is short — use total
+        if (a.status === 'Finished Airing' && a.episodes > 0 && airedEps.length < a.episodes) {
+          airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
+        }
+      }
+    } catch(e) {}
+
+    // Fallback: if Jikan has no episode list, use total count
+    if (!airedEps.length && a.episodes > 0 && a.status !== 'Currently Airing') {
+      airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
+    }
+
+    const airedCount = airedEps.length;
+
+    if (airedCount > 0) {
+      epCountEl.textContent = a.status === 'Currently Airing'
+        ? `${airedCount} aired / ${a.episodes || '?'} total`
+        : `${airedCount} episodes`;
+
+      epGrid.innerHTML = `<div class="episodes-grid">
+        ${airedEps.map(n =>
+          `<a href="watch.html?id=${id}&ep=${n}" class="ep-btn">${String(n).padStart(2,'0')}</a>`
+        ).join('')}
+      </div>`;
+
+    } else {
+      epCountEl.textContent = a.status === 'Currently Airing' ? 'Airing — no episodes yet' : 'Episodes unavailable';
+      epGrid.innerHTML = `<p style="color:var(--muted);font-size:.85rem">
+        ${a.status === 'Currently Airing' ? 'Episodes will appear here after they air.' : 'Episode list unavailable.'}
+      </p>`;
+    }
+
+    // Related
+    const relatedGrid = document.getElementById('related-grid');
+    const related = a.relations?.filter(r => r.relation === 'Sequel' || r.relation === 'Prequel' || r.relation === 'Side Story') || [];
+    if (related.length) {
+      relatedGrid.innerHTML = related.slice(0,6).map(r => {
+        const entry = r.entry?.[0];
+        if (!entry) return '';
+        return `<div class="anime-card" onclick="window.location='anime.html?id=${entry.mal_id}&src=mal'" role="button" tabindex="0">
+          <div style="aspect-ratio:2/3;background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.75rem;padding:0.5rem;text-align:center">${entry.name}</div>
+          <div class="anime-card-info">
+            <div class="anime-card-title">${entry.name}</div>
+            <div class="anime-card-meta">${r.relation}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      relatedGrid.innerHTML = `<p style="color:var(--muted)">No related entries</p>`;
+    }
+
+  } catch(e) {
+    showToast('Failed to load anime.');
+    console.error(e);
+  }
+}
+
+window.toggleFavorite = (id, title, img) => {
+  const favs = JSON.parse(localStorage.getItem('favorites') || '[]');
+  const idx = favs.findIndex(f => f.id == id);
+  if (idx >= 0) { favs.splice(idx, 1); showToast('Removed from favorites'); }
+  else { favs.push({ id, title, img }); showToast('Added to favorites'); }
+  localStorage.setItem('favorites', JSON.stringify(favs));
+};
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Downloads — AniStream</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .dl-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1rem; }
+    .dl-card {
+      background:var(--card); border:1px solid var(--border); border-radius:8px;
+      display:flex; gap:1rem; padding:.8rem; align-items:flex-start;
+      transition:border-color .2s;
+    }
+    .dl-card:hover { border-color:rgba(255,255,255,.2); }
+    .dl-cover { width:56px; height:80px; object-fit:cover; border-radius:5px; flex-shrink:0; }
+    .dl-info { flex:1; min-width:0; }
+    .dl-title { font-size:.9rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .dl-ep { font-size:.78rem; color:var(--muted); margin:.2rem 0 .6rem; }
+    .dl-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .empty-state { text-align:center; padding:4rem 2rem; color:var(--muted); }
+    .empty-state .icon { font-size:3rem; margin-bottom:1rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">ANISTREAM</a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="search.html">Browse</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <form class="nav-search" action="search.html" method="get">
+      <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
+      <button type="submit">⌕</button>
+    </form>
+    <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+  </div>
+</nav>
+
+<div style="padding:2rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <h1 style="font-family:'Orbitron',sans-serif;font-size:1rem;letter-spacing:3px">MY DOWNLOADS</h1>
+    <div id="dl-count" style="font-size:.8rem;color:var(--muted)"></div>
+  </div>
+
+  <div id="dl-container">
+    <!-- Skeletons -->
+    <div class="dl-grid" id="dl-grid">
+      <div class="skeleton" style="height:100px;border-radius:8px"></div>
+      <div class="skeleton" style="height:100px;border-radius:8px"></div>
+      <div class="skeleton" style="height:100px;border-radius:8px"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-logo">ANISTREAM</div>
+  <p>Metadata by <a href="https://jikan.moe" target="_blank" rel="noopener" style="color:var(--text)">Jikan</a></p>
+</footer>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
+
+injectAuthModal();
+
+async function init() {
+  const user = await getUser();
+  renderNavUser(user);
+
+  const grid = document.getElementById('dl-grid');
+  const count = document.getElementById('dl-count');
+
+  if (!user) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="icon">🔒</div>
+        <p style="font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:2px;margin-bottom:1rem">LOGIN REQUIRED</p>
+        <p style="margin-bottom:1.5rem">You need an account to view and manage downloads.</p>
+        <button onclick="document.getElementById('auth-modal').style.display='flex'" class="btn btn-primary">LOGIN / REGISTER</button>
+      </div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch('backend/api/downloads.php');
+    const downloads = await res.json();
+
+    if (!downloads.length) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">📥</div>
+          <p style="font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:2px;margin-bottom:1rem">NO DOWNLOADS YET</p>
+          <p style="margin-bottom:1.5rem">Go to a watch page and click the Download button to save episodes.</p>
+          <a href="index.html" class="btn btn-primary">BROWSE ANIME</a>
+        </div>`;
+      count.textContent = '0 downloads';
+      return;
+    }
+
+    count.textContent = `${downloads.length} download${downloads.length !== 1 ? 's' : ''}`;
+    grid.innerHTML = downloads.map(d => `
+      <div class="dl-card" id="dl-${d.id}">
+        <img class="dl-cover" src="${d.cover || ''}" alt="${d.title}"
+          onerror="this.src='https://via.placeholder.com/56x80/111/444?text=?'">
+        <div class="dl-info">
+          <div class="dl-title" title="${d.title}">${d.title}</div>
+          <div class="dl-ep">Episode ${d.episode}${d.ep_title ? ' · ' + d.ep_title : ''}</div>
+          <div class="dl-actions">
+            <a href="watch.html?id=${d.mal_id}&ep=${d.episode}" class="btn btn-primary" style="font-size:.65rem;padding:.3rem .7rem">▶ Watch</a>
+            ${d.download_url ? `<a href="${d.download_url}" target="_blank" rel="noopener" class="btn btn-ghost" style="font-size:.65rem;padding:.3rem .7rem">⬇ Download</a>` : ''}
+            <button onclick="removeDownload(${d.id})" class="btn btn-ghost" style="font-size:.65rem;padding:.3rem .7rem;color:#f87171;border-color:#f87171">✕ Remove</button>
+          </div>
+        </div>
+      </div>`).join('');
+
+  } catch (e) {
+    grid.innerHTML = `<p style="color:var(--muted);grid-column:1/-1">Failed to load downloads.</p>`;
+  }
+}
+
+window.removeDownload = async (id) => {
+  const res = await fetch(`backend/api/downloads.php?id=${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById(`dl-${id}`)?.remove();
+    showToast('Removed from downloads');
+    const remaining = document.querySelectorAll('[id^="dl-"]').length;
+    document.getElementById('dl-count').textContent = `${remaining} download${remaining !== 1 ? 's' : ''}`;
+    if (!remaining) location.reload();
+  }
+};
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>

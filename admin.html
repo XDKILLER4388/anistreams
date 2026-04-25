@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — AniStream</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { display:flex; min-height:100vh; background:var(--bg); overflow-x:hidden; }
+
+    /* ── Sidebar ── */
+    .admin-sidebar {
+      width:240px; flex-shrink:0;
+      background:#0d0d0d;
+      border-right:1px solid #1a1a1a;
+      display:flex; flex-direction:column;
+      position:fixed; top:0; left:0; height:100vh; z-index:10;
+    }
+
+    /* Brand / logo row */
+    .sidebar-brand {
+      height:60px; padding:0 1.25rem;
+      border-bottom:1px solid #1a1a1a;
+      display:flex; align-items:center; gap:.75rem;
+      flex-shrink:0;
+    }
+    .sidebar-brand-icon {
+      width:34px; height:34px; border-radius:8px;
+      background:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.85rem; font-weight:900; color:#000;
+      font-family:'Orbitron',sans-serif; flex-shrink:0;
+      letter-spacing:0;
+    }
+    .sidebar-brand-text { line-height:1.25; min-width:0; }
+    .sidebar-brand-name {
+      font-family:'Orbitron',sans-serif; font-size:.78rem;
+      letter-spacing:2px; color:#fff; white-space:nowrap;
+    }
+    .sidebar-brand-sub {
+      font-size:.6rem; color:#555; letter-spacing:1px;
+      margin-top:.1rem; white-space:nowrap; text-transform:uppercase;
+    }
+
+    /* Nav list */
+    .sidebar-nav {
+      flex:1; min-height:0;
+      overflow-y:auto; overflow-x:hidden;
+      padding:.75rem 0;
+    }
+    .sidebar-nav::-webkit-scrollbar { width:3px; }
+    .sidebar-nav::-webkit-scrollbar-track { background:transparent; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background:#222; border-radius:3px; }
+
+    /* Section divider label */
+    .nav-section-label {
+      font-size:.6rem; letter-spacing:2px; color:#555;
+      padding:.9rem 1.25rem .3rem;
+      text-transform:uppercase; font-family:'Orbitron',sans-serif;
+      user-select:none;
+    }
+
+    /* Nav item */
+    .sidebar-link {
+      display:flex; align-items:center; gap:.85rem;
+      padding:.72rem 1.25rem;
+      font-size:.9rem; font-weight:500;
+      color:#aaa;
+      cursor:pointer; transition:background .15s, color .15s, border-color .15s;
+      border:none; background:none;
+      width:100%; text-align:left;
+      border-left:3px solid transparent;
+      font-family:'Rajdhani',sans-serif;
+      white-space:nowrap;
+    }
+    .sidebar-link:hover {
+      color:#fff;
+      background:rgba(255,255,255,.05);
+      border-left-color:#555;
+    }
+    .sidebar-link.active {
+      color:#fff;
+      background:rgba(255,255,255,.07);
+      border-left-color:#fff;
+      font-weight:600;
+    }
+
+    /* Icon box — same size as MHDC icons */
+    .sidebar-icon {
+      width:20px; height:20px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1rem; flex-shrink:0; opacity:.7;
+    }
+    .sidebar-link.active .sidebar-icon,
+    .sidebar-link:hover .sidebar-icon { opacity:1; }
+
+    /* Online badge pill */
+    .sidebar-badge {
+      margin-left:auto;
+      background:rgba(74,222,128,.15); color:#4ade80;
+      font-size:.6rem; font-weight:700;
+      padding:.15rem .5rem; border-radius:20px;
+      flex-shrink:0; font-family:'Rajdhani',sans-serif;
+    }
+
+    /* Footer / user row */
+    .sidebar-footer {
+      padding:.9rem 1.25rem;
+      border-top:1px solid #1a1a1a;
+      display:flex; align-items:center; gap:.75rem;
+      flex-shrink:0;
+    }
+    .sidebar-avatar {
+      width:32px; height:32px; border-radius:50%;
+      background:linear-gradient(135deg,#2a2a2a,#444);
+      border:1px solid #333;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.75rem; font-weight:700; color:#ccc;
+      flex-shrink:0;
+    }
+    .sidebar-user-info { flex:1; min-width:0; }
+    .sidebar-username {
+      font-size:.82rem; font-weight:600; color:#ddd;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .sidebar-role { font-size:.6rem; color:#4ade80; letter-spacing:1px; text-transform:uppercase; }
+    .sidebar-logout {
+      background:none; border:none; cursor:pointer;
+      color:#444; font-size:1rem;
+      padding:.25rem; transition:color .2s; flex-shrink:0;
+      line-height:1;
+    }
+    .sidebar-logout:hover { color:#f87171; }
+
+    /* ── Main ── */
+    .admin-main {
+      flex:1; margin-left:240px; overflow-y:auto; overflow-x:hidden; height:100vh;
+      display:flex; flex-direction:column;
+    }
+
+    /* ── Top bar ── */
+    .admin-topbar {
+      padding:0 2rem; height:60px;
+      border-bottom:1px solid #1a1a1a;
+      display:flex; align-items:center; justify-content:space-between;
+      background:#0d0d0d; position:sticky; top:0; z-index:5;
+      flex-shrink:0;
+    }
+    .topbar-left { display:flex; align-items:center; gap:.75rem; }
+    .topbar-page { font-family:'Orbitron',sans-serif; font-size:.85rem; letter-spacing:3px; }
+    .topbar-breadcrumb { font-size:.72rem; color:var(--muted); }
+    .topbar-right { display:flex; align-items:center; gap:1rem; }
+    .refresh-pill {
+      display:flex; align-items:center; gap:.4rem;
+      background:var(--card); border:1px solid var(--border);
+      border-radius:20px; padding:.3rem .8rem;
+      font-size:.65rem; color:var(--muted);
+    }
+    .refresh-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; animation:pulse-dot 2s infinite; }
+
+    /* ── Content ── */
+    .admin-content { padding:1.75rem 2rem; flex:1; }
+
+    /* ── Stats ── */
+    .stats-grid {
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:1rem; margin-bottom:2rem;
+    }
+    .stat-card {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:10px; padding:1.25rem 1.25rem 1rem;
+      position:relative; overflow:hidden;
+      transition:border-color .2s, transform .15s;
+      cursor:pointer;
+    }
+    .stat-card:hover { border-color:#333; transform:translateY(-2px); }
+    .stat-card-icon {
+      font-size:1.4rem; margin-bottom:.75rem; display:block;
+      opacity:.7;
+    }
+    .stat-card .val {
+      font-family:'Orbitron',sans-serif; font-size:2rem; font-weight:700;
+      line-height:1;
+    }
+    .stat-card .lbl {
+      font-size:.62rem; color:var(--muted); letter-spacing:1.5px;
+      margin-top:.4rem; text-transform:uppercase;
+    }
+    .stat-card .trend {
+      font-size:.65rem; margin-top:.5rem;
+      display:flex; align-items:center; gap:.3rem;
+    }
+    .stat-card-glow {
+      position:absolute; top:0; right:0;
+      width:80px; height:80px; border-radius:50%;
+      filter:blur(30px); opacity:.08; pointer-events:none;
+    }
+    .stat-card.green .val { color:#4ade80; }
+    .stat-card.green .stat-card-glow { background:#4ade80; }
+    .stat-card.yellow .val { color:#fbbf24; }
+    .stat-card.yellow .stat-card-glow { background:#fbbf24; }
+    .stat-card.blue .val { color:#60a5fa; }
+    .stat-card.blue .stat-card-glow { background:#60a5fa; }
+    .stat-card.red .val { color:#f87171; }
+    .stat-card.red .stat-card-glow { background:#f87171; }
+
+    /* ── Dashboard grid ── */
+    .dash-grid { display:grid; grid-template-columns:1fr 340px; gap:1.5rem; }
+    .dash-panel {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:10px; overflow:hidden;
+    }
+    .dash-panel-header {
+      padding:.9rem 1.25rem; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .dash-panel-title {
+      font-family:'Orbitron',sans-serif; font-size:.65rem;
+      letter-spacing:2px; color:var(--muted);
+    }
+    .dash-panel-body { padding:0; }
+
+    /* ── Table ── */
+    .admin-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .admin-table th {
+      text-align:left; padding:.7rem 1.25rem;
+      font-family:'Orbitron',sans-serif; font-size:.58rem;
+      letter-spacing:2px; color:#555;
+      border-bottom:1px solid var(--border);
+      background:#0d0d0d; white-space:nowrap;
+    }
+    .admin-table td {
+      padding:.75rem 1.25rem;
+      border-bottom:1px solid rgba(255,255,255,.03);
+      vertical-align:middle;
+    }
+    .admin-table tbody tr:last-child td { border-bottom:none; }
+    .admin-table tbody tr:hover td { background:rgba(255,255,255,.02); }
+
+    /* ── Badges ── */
+    .badge {
+      display:inline-flex; align-items:center; gap:.3rem;
+      padding:.2rem .6rem; border-radius:20px;
+      font-size:.6rem; letter-spacing:.5px; font-weight:600;
+    }
+    .badge-green  { background:rgba(74,222,128,.12); color:#4ade80; border:1px solid rgba(74,222,128,.2); }
+    .badge-red    { background:rgba(248,113,113,.12); color:#f87171; border:1px solid rgba(248,113,113,.2); }
+    .badge-yellow { background:rgba(251,191,36,.12);  color:#fbbf24; border:1px solid rgba(251,191,36,.2); }
+    .badge-blue   { background:rgba(96,165,250,.12);  color:#60a5fa; border:1px solid rgba(96,165,250,.2); }
+    .badge-gray   { background:rgba(255,255,255,.06); color:var(--muted); border:1px solid var(--border); }
+
+    /* ── Online dot ── */
+    .online-dot {
+      width:7px; height:7px; border-radius:50%;
+      background:#4ade80; display:inline-block;
+      animation:pulse-dot 2s infinite; flex-shrink:0;
+    }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display:flex; gap:.4rem; margin-bottom:1.5rem;
+      flex-wrap:wrap;
+    }
+    .tab-btn {
+      padding:.35rem .9rem; font-family:'Orbitron',sans-serif;
+      font-size:.6rem; letter-spacing:1px;
+      background:none; border:1px solid var(--border);
+      border-radius:4px; color:var(--muted); cursor:pointer; transition:all .15s;
+    }
+    .tab-btn:hover { color:var(--text); border-color:#444; }
+    .tab-btn.active { background:var(--text); color:var(--bg); border-color:var(--text); }
+
+    /* ── Search ── */
+    .admin-search { display:flex; gap:.75rem; margin-bottom:1.25rem; }
+    .admin-search input {
+      flex:1; padding:.65rem 1rem;
+      background:var(--card); border:1px solid var(--border);
+      border-radius:6px; color:var(--text);
+      font-family:'Rajdhani',sans-serif; font-size:.9rem;
+      outline:none; transition:border-color .2s;
+    }
+    .admin-search input:focus { border-color:#444; }
+    .admin-search input::placeholder { color:#444; }
+
+    /* ── Action buttons ── */
+    .act-btn {
+      padding:.25rem .65rem; font-size:.62rem; border-radius:4px;
+      cursor:pointer; border:1px solid; transition:all .15s;
+      font-family:'Rajdhani',sans-serif; letter-spacing:.5px;
+    }
+    .act-ban   { color:#fbbf24; border-color:rgba(251,191,36,.4); background:none; }
+    .act-ban:hover { background:rgba(251,191,36,.1); border-color:#fbbf24; }
+    .act-del   { color:#f87171; border-color:rgba(248,113,113,.4); background:none; }
+    .act-del:hover { background:rgba(248,113,113,.1); border-color:#f87171; }
+    .act-unban { color:#4ade80; border-color:rgba(74,222,128,.4); background:none; }
+    .act-unban:hover { background:rgba(74,222,128,.1); border-color:#4ade80; }
+    .act-log   { color:var(--muted); border-color:var(--border); background:none; }
+    .act-log:hover { color:var(--text); border-color:#444; }
+
+    /* ── Log action colors ── */
+    .log-login    { color:#4ade80; font-weight:600; }
+    .log-logout   { color:#555; }
+    .log-register { color:#60a5fa; font-weight:600; }
+    .log-download { color:#fbbf24; }
+    .log-banned   { color:#f87171; font-weight:600; }
+    .log-unbanned { color:#4ade80; }
+
+    /* ── Section label ── */
+    .section-label {
+      font-family:'Orbitron',sans-serif; font-size:.65rem;
+      letter-spacing:2.5px; color:var(--muted); margin-bottom:1rem;
+      display:flex; align-items:center; gap:.75rem;
+    }
+    .section-label::after {
+      content:''; flex:1; height:1px; background:var(--border);
+    }
+
+    /* ── User avatar ── */
+    .user-avatar {
+      width:30px; height:30px; border-radius:50%;
+      background:linear-gradient(135deg,#222,#444);
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:.7rem; font-weight:700; flex-shrink:0;
+      border:1px solid var(--border);
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      padding:3rem 2rem; text-align:center;
+      color:var(--muted); font-size:.85rem;
+    }
+    .empty-state .empty-icon { font-size:2.5rem; margin-bottom:.75rem; opacity:.4; }
+
+    /* ── Scrollable table wrapper ── */
+    .table-wrap { overflow-x:auto; }
+
+    /* ── Pagination ── */
+    .pagination { display:flex; gap:.4rem; margin-top:1.25rem; justify-content:center; flex-wrap:wrap; }
+
+    /* ── Activity log row ── */
+    .log-action-pill {
+      display:inline-block; padding:.15rem .55rem;
+      border-radius:3px; font-size:.6rem; letter-spacing:.5px;
+      font-family:'Orbitron',sans-serif;
+    }
+    .pill-login    { background:rgba(74,222,128,.1);  color:#4ade80; }
+    .pill-logout   { background:rgba(255,255,255,.05); color:#555; }
+    .pill-register { background:rgba(96,165,250,.1);  color:#60a5fa; }
+    .pill-download { background:rgba(251,191,36,.1);  color:#fbbf24; }
+    .pill-banned   { background:rgba(248,113,113,.1); color:#f87171; }
+    .pill-unbanned { background:rgba(74,222,128,.1);  color:#4ade80; }
+    .pill-default  { background:rgba(255,255,255,.05); color:var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="admin-sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-icon">A</div>
+    <div class="sidebar-brand-text">
+      <div class="sidebar-brand-name">ANISTREAM</div>
+      <div class="sidebar-brand-sub">Admin Panel</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Overview</div>
+
+    <button class="sidebar-link active" data-section="dashboard" onclick="showSection('dashboard',this)">
+      <span class="sidebar-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+        </svg>
+      </span>
+      Dashboard
+    </button>
+
+    <div class="nav-section-label">Management</div>
+
+    <button class="sidebar-link" data-section="users" onclick="showSection('users',this)">
+      <span class="sidebar-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      Users
+    </button>
+
+    <button class="sidebar-link" data-section="online" onclick="showSection('online',this)">
+      <span class="sidebar-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      Online Now
+      <span class="sidebar-badge" id="online-count">—</span>
+    </button>
+
+    <button class="sidebar-link" data-section="activity" onclick="showSection('activity',this)">
+      <span class="sidebar-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"/>
+          <line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      </span>
+      Activity Log
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-avatar" id="sidebar-avatar">A</div>
+    <div class="sidebar-user-info">
+      <div class="sidebar-username" id="admin-name">Loading…</div>
+      <div class="sidebar-role">Administrator</div>
+    </div>
+    <button class="sidebar-logout" onclick="doLogout()" title="Logout">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<main class="admin-main">
+
+  <!-- Top bar -->
+  <div class="admin-topbar">
+    <div class="topbar-left">
+      <span class="topbar-page" id="topbar-title">DASHBOARD</span>
+    </div>
+    <div class="topbar-right">
+      <button id="sync-btn" onclick="runSync()" style="
+        display:flex;align-items:center;gap:.4rem;
+        background:none;border:1px solid #333;border-radius:6px;
+        color:#aaa;font-size:.7rem;padding:.35rem .8rem;cursor:pointer;
+        font-family:'Rajdhani',sans-serif;transition:all .2s;
+      " onmouseover="this.style.borderColor='#555';this.style.color='#fff'"
+         onmouseout="this.style.borderColor='#333';this.style.color='#aaa'">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Sync Anime
+      </button>
+      <div class="refresh-pill" id="refresh-timer">
+        <span class="refresh-dot"></span>
+        Auto-refresh in <span id="countdown">30</span>s
+      </div>
+      <a href="index.html" style="font-size:.7rem;color:var(--muted);text-decoration:none;transition:color .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color=''">← Site</a>
+    </div>
+  </div>
+
+  <!-- Sync log panel (hidden by default) -->
+  <div id="sync-panel" style="display:none;margin:0 2rem;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:8px;overflow:hidden;">
+    <div style="padding:.6rem 1rem;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:2px;color:#555">SYNC LOG</span>
+      <button onclick="document.getElementById('sync-panel').style.display='none'" style="background:none;border:none;color:#444;cursor:pointer;font-size:.9rem;">✕</button>
+    </div>
+    <div id="sync-log" style="padding:1rem;font-family:monospace;font-size:.72rem;color:#4ade80;line-height:1.8;max-height:200px;overflow-y:auto;"></div>
+  </div>
+
+  <!-- ── Dashboard ── -->
+  <section id="sec-dashboard" class="admin-content">
+    <div class="stats-grid" id="stats-grid">
+      <div class="skeleton" style="height:110px;border-radius:10px"></div>
+      <div class="skeleton" style="height:110px;border-radius:10px"></div>
+      <div class="skeleton" style="height:110px;border-radius:10px"></div>
+      <div class="skeleton" style="height:110px;border-radius:10px"></div>
+      <div class="skeleton" style="height:110px;border-radius:10px"></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">RECENT ACTIVITY</span>
+          <span style="font-size:.65rem;color:var(--muted)">Last 20 events</span>
+        </div>
+        <div class="dash-panel-body" id="recent-activity">
+          <div class="skeleton" style="height:280px;margin:1rem;border-radius:6px"></div>
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">ONLINE NOW</span>
+          <span class="online-dot"></span>
+        </div>
+        <div class="dash-panel-body" id="dash-online">
+          <div class="skeleton" style="height:280px;margin:1rem;border-radius:6px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Users ── -->
+  <section id="sec-users" style="display:none" class="admin-content">
+    <div class="admin-search">
+      <input type="text" id="user-search" placeholder="Search by username or email…" oninput="searchUsers()">
+    </div>
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <span class="dash-panel-title">ALL USERS</span>
+        <button onclick="loadUsers()" class="act-btn act-log" style="font-size:.6rem">↻ Refresh</button>
+      </div>
+      <div class="table-wrap" id="users-table-wrap">
+        <div class="skeleton" style="height:300px;margin:1rem;border-radius:6px"></div>
+      </div>
+    </div>
+    <div class="pagination" id="users-pagination"></div>
+  </section>
+
+  <!-- ── Online ── -->
+  <section id="sec-online" style="display:none" class="admin-content">
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <span class="dash-panel-title">ONLINE NOW</span>
+        <button onclick="loadOnline()" class="act-btn act-log" style="font-size:.6rem">↻ Refresh</button>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);padding:.75rem 1.25rem 0">Users active in the last 15 minutes.</p>
+      <div class="table-wrap" id="online-list">
+        <div class="skeleton" style="height:200px;margin:1rem;border-radius:6px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Activity Log ── -->
+  <section id="sec-activity" style="display:none" class="admin-content">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="filterActivity('',this)">All</button>
+      <button class="tab-btn" onclick="filterActivity('login',this)">Logins</button>
+      <button class="tab-btn" onclick="filterActivity('logout',this)">Logouts</button>
+      <button class="tab-btn" onclick="filterActivity('register',this)">Registrations</button>
+      <button class="tab-btn" onclick="filterActivity('download',this)">Downloads</button>
+      <button class="tab-btn" onclick="filterActivity('banned',this)">Bans</button>
+    </div>
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <span class="dash-panel-title">ACTIVITY LOG</span>
+        <button onclick="loadActivity()" class="act-btn act-log" style="font-size:.6rem">↻ Refresh</button>
+      </div>
+      <div class="table-wrap" id="activity-table">
+        <div class="skeleton" style="height:400px;margin:1rem;border-radius:6px"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API  = 'backend/api/admin.php';
+const AUTH = 'backend/api/auth.php';
+let currentSection = 'dashboard';
+let userPage = 1;
+let actFilter = '';
+let countdownInterval, countdownVal = 30;
+
+// ── Fetch wrapper — always sends session cookie ───────────────────────────────
+function apiFetch(url, opts = {}) {
+  return fetch(url, { credentials: 'include', ...opts });
+}
+
+// ── Sync ──────────────────────────────────────────────────────────────────────
+async function runSync() {
+  const btn   = document.getElementById('sync-btn');
+  const panel = document.getElementById('sync-panel');
+  const logEl = document.getElementById('sync-log');
+
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 1s linear infinite"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Syncing…';
+
+  panel.style.display = 'block';
+  logEl.innerHTML = '<span style="color:#555">Starting sync…</span>';
+
+  // Add spin animation if not already present
+  if (!document.getElementById('spin-style')) {
+    const s = document.createElement('style');
+    s.id = 'spin-style';
+    s.textContent = '@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+    document.head.appendChild(s);
+  }
+
+  try {
+    const res  = await apiFetch('backend/cron/fetch_anime.php?secret=anistream_sync');
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) {
+      logEl.innerHTML = `<span style="color:#f87171">Error: ${esc(text.substring(0,400))}</span>`;
+      return;
+    }
+
+    if (data.error) {
+      logEl.innerHTML = `<span style="color:#f87171">Error: ${esc(data.error)}</span>`;
+      return;
+    }
+
+    logEl.innerHTML = (data.log || []).map(line => {
+      const color = line.includes('Error') ? '#f87171' : line.includes('Done') ? '#fbbf24' : '#4ade80';
+      return `<div style="color:${color}">${esc(line)}</div>`;
+    }).join('');
+    logEl.scrollTop = logEl.scrollHeight;
+
+    showToast(`✓ Sync done — +${data.inserted} new, ${data.updated} updated`);
+    loadDashboard(); // refresh stats
+  } catch(e) {
+    logEl.innerHTML = `<span style="color:#f87171">Sync failed: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Sync Anime';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await apiFetch(AUTH + '?action=me');
+    const text = await r.text();
+    let d;
+    try { d = JSON.parse(text); }
+    catch(e) {
+      showError('Auth API returned non-JSON: ' + text.substring(0, 200));
+      return;
+    }
+    if (!d.user || d.user.role !== 'admin') {
+      document.body.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:1.25rem;width:100%">
+          <div style="font-size:3rem;opacity:.3">🔒</div>
+          <p style="font-family:'Orbitron',sans-serif;letter-spacing:3px;font-size:.9rem">ACCESS DENIED</p>
+          <p style="color:var(--muted);font-size:.82rem">Admin account required. <span style="color:#f87171">${d.error || 'Not logged in'}</span></p>
+          <a href="index.html" class="btn btn-ghost" style="font-size:.72rem">← Back to site</a>
+        </div>`;
+      return;
+    }
+    const name = d.user.username;
+    document.getElementById('admin-name').textContent = name;
+    document.getElementById('sidebar-avatar').textContent = name.charAt(0).toUpperCase();
+    loadDashboard();
+    startAutoRefresh();
+  } catch(e) {
+    showError('Init failed: ' + e.message);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('stats-grid').innerHTML =
+    `<div style="grid-column:1/-1;padding:1.5rem;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;color:#f87171;font-size:.82rem;font-family:monospace">${msg}</div>`;
+  document.getElementById('recent-activity').innerHTML = '';
+  document.getElementById('dash-online').innerHTML = '';
+}
+
+// ── Section switching ─────────────────────────────────────────────────────────
+function navTo(name) {
+  const btn = document.querySelector(`[data-section="${name}"]`);
+  showSection(name, btn);
+}
+
+function showSection(name, btn) {
+  currentSection = name;
+  document.querySelectorAll('[id^="sec-"]').forEach(s => s.style.display = 'none');
+  document.getElementById('sec-' + name).style.display = 'block';
+  document.querySelectorAll('.sidebar-link').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const titles = { dashboard:'DASHBOARD', users:'USERS', online:'ONLINE NOW', activity:'ACTIVITY LOG' };
+  document.getElementById('topbar-title').textContent = titles[name] || name.toUpperCase();
+
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'users')     loadUsers();
+  if (name === 'online')    loadOnline();
+  if (name === 'activity')  loadActivity();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  // Fetch each independently so one failure doesn't kill everything
+  async function safeFetch(url) {
+    try {
+      const r = await apiFetch(url);
+      const text = await r.text();
+      try { return JSON.parse(text); }
+      catch(e) { console.error('Non-JSON from', url, ':', text.substring(0,300)); return null; }
+    } catch(e) { console.error('Fetch failed', url, e); return null; }
+  }
+
+  const [statsRes, actRes, onlineRes] = await Promise.all([
+    safeFetch(API + '?action=stats'),
+    safeFetch(API + '?action=activity&limit=20'),
+    safeFetch(API + '?action=online')
+  ]);
+
+  // Stats cards
+  if (!statsRes || statsRes.error) {
+    document.getElementById('stats-grid').innerHTML =
+      `<div style="grid-column:1/-1;padding:1rem;color:#f87171;font-size:.8rem;font-family:monospace;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px">
+        Stats API error: ${statsRes?.error || 'No response — check browser console (F12)'}
+      </div>`;
+  } else {
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card green" onclick="navTo('online')" title="View Online Users">
+        <div class="stat-card-glow"></div>
+        <span class="stat-card-icon">●</span>
+        <div class="val">${statsRes.online_users ?? 0}</div>
+        <div class="lbl">Online Now</div>
+      </div>
+      <div class="stat-card" onclick="navTo('users')" title="View All Users">
+        <div class="stat-card-glow" style="background:#fff"></div>
+        <span class="stat-card-icon">◎</span>
+        <div class="val">${statsRes.total_users ?? 0}</div>
+        <div class="lbl">Total Users</div>
+      </div>
+      <div class="stat-card yellow" onclick="navTo('activity')" title="View Activity Log">
+        <div class="stat-card-glow"></div>
+        <span class="stat-card-icon">↗</span>
+        <div class="val">${statsRes.today_logins ?? 0}</div>
+        <div class="lbl">Logins Today</div>
+      </div>
+      <div class="stat-card blue" onclick="navTo('activity')" title="View Downloads Activity">
+        <div class="stat-card-glow"></div>
+        <span class="stat-card-icon">↓</span>
+        <div class="val">${statsRes.total_downloads ?? 0}</div>
+        <div class="lbl">Downloads</div>
+      </div>
+      <div class="stat-card red" onclick="navTo('users')" title="View Banned Users">
+        <div class="stat-card-glow"></div>
+        <span class="stat-card-icon">⊘</span>
+        <div class="val">${statsRes.banned_users ?? 0}</div>
+        <div class="lbl">Banned</div>
+      </div>`;
+  }
+
+  // Online badge
+  const onlineCount = Array.isArray(onlineRes) ? onlineRes.length : 0;
+  document.getElementById('online-count').textContent = onlineCount;
+
+  // Recent activity
+  document.getElementById('recent-activity').innerHTML = renderActivityTable(actRes, true);
+
+  // Online panel
+  if (!Array.isArray(onlineRes) || !onlineRes.length) {
+    document.getElementById('dash-online').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">◎</div>No users online</div>';
+  } else {
+    document.getElementById('dash-online').innerHTML = `
+      <table class="admin-table">
+        <thead><tr><th>USER</th><th>LAST SEEN</th></tr></thead>
+        <tbody>
+          ${onlineRes.map(u => `
+            <tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:.6rem">
+                  <span class="online-dot"></span>
+                  <div>
+                    <div style="font-weight:600;font-size:.82rem">${esc(u.username)}</div>
+                    <div style="font-size:.68rem;color:var(--muted)">${esc(u.email)}</div>
+                  </div>
+                </div>
+              </td>
+              <td style="color:var(--muted);font-size:.75rem">${fmtDate(u.last_seen)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+let searchTimer;
+function searchUsers() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { userPage = 1; loadUsers(); }, 350);
+}
+
+async function loadUsers() {
+  const q = document.getElementById('user-search')?.value || '';
+  const wrap = document.getElementById('users-table-wrap');
+  try {
+    const res  = await apiFetch(`${API}?action=users&page=${userPage}&q=${encodeURIComponent(q)}`);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) {
+      wrap.innerHTML = `<div class="empty-state" style="color:#f87171">API error: ${text.substring(0,300)}</div>`;
+      return;
+    }
+
+    if (data.error) {
+      wrap.innerHTML = `<div class="empty-state" style="color:#f87171">Error: ${esc(data.error)}</div>`;
+      return;
+    }
+
+    if (!data.users?.length) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-icon" style="font-size:2rem;opacity:.3">👥</div>No users found.</div>';
+      document.getElementById('users-pagination').innerHTML = '';
+      return;
+    }
+
+    wrap.innerHTML = `
+      <table class="admin-table">
+        <thead><tr>
+          <th>USER</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th>
+          <th>LOGINS</th><th>DOWNLOADS</th><th>JOINED</th><th>LAST SEEN</th><th>ACTIONS</th>
+        </tr></thead>
+        <tbody>
+          ${data.users.map(u => `
+            <tr id="urow-${u.id}">
+              <td>
+                <div style="display:flex;align-items:center;gap:.6rem">
+                  <div class="user-avatar">${esc(u.username).charAt(0).toUpperCase()}</div>
+                  <strong>${esc(u.username)}</strong>
+                </div>
+              </td>
+              <td style="color:var(--muted);font-size:.78rem">${esc(u.email)}</td>
+              <td>
+                ${u.role === 'admin'
+                  ? '<span class="badge badge-yellow">ADMIN</span>'
+                  : '<span class="badge badge-gray">USER</span>'}
+              </td>
+              <td>
+                ${u.is_banned
+                  ? '<span class="badge badge-red">⊘ BANNED</span>'
+                  : isOnline(u.last_seen)
+                    ? '<span class="badge badge-green"><span class="online-dot"></span>Online</span>'
+                    : '<span class="badge badge-gray">Offline</span>'}
+              </td>
+              <td style="font-family:'Orbitron',sans-serif;font-size:.75rem">${u.login_count}</td>
+              <td style="font-family:'Orbitron',sans-serif;font-size:.75rem">${u.downloads}</td>
+              <td style="color:var(--muted);font-size:.75rem">${fmtDate(u.created_at)}</td>
+              <td style="color:var(--muted);font-size:.75rem">${u.last_seen ? fmtDate(u.last_seen) : 'Never'}</td>
+              <td>
+                <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+                  ${u.is_banned
+                    ? `<button class="act-btn act-unban" onclick="banUser(${u.id},0)">Unban</button>`
+                    : `<button class="act-btn act-ban" onclick="banUser(${u.id},1)">Ban</button>`}
+                  <button class="act-btn act-del" onclick="deleteUser(${u.id},'${esc(u.username)}')">Delete</button>
+                  <button class="act-btn act-log" onclick="viewUserActivity(${u.id})">Log</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+    const pages = Math.ceil(data.total / 20);
+    let pag = '';
+    if (pages > 1) {
+      if (userPage > 1) pag += `<button onclick="userPage=${userPage-1};loadUsers()" class="btn btn-ghost" style="font-size:.62rem;padding:.3rem .7rem">‹</button>`;
+      for (let i = Math.max(1,userPage-2); i <= Math.min(pages,userPage+2); i++) {
+        pag += `<button onclick="userPage=${i};loadUsers()" class="btn ${i===userPage?'btn-primary':'btn-ghost'}" style="font-size:.62rem;padding:.3rem .7rem">${i}</button>`;
+      }
+      if (userPage < pages) pag += `<button onclick="userPage=${userPage+1};loadUsers()" class="btn btn-ghost" style="font-size:.62rem;padding:.3rem .7rem">›</button>`;
+    }
+    document.getElementById('users-pagination').innerHTML = pag;
+  } catch(e) {
+    document.getElementById('users-table-wrap').innerHTML =
+      `<div class="empty-state" style="color:#f87171">Failed to load users: ${e.message}</div>`;
+  }
+}
+
+// ── Online ────────────────────────────────────────────────────────────────────
+async function loadOnline() {
+  try {
+    const data = await apiFetch(API + '?action=online').then(r => r.json());
+    document.getElementById('online-count').textContent = Array.isArray(data) ? data.length : 0;
+    if (!Array.isArray(data) || !data.length) {
+      document.getElementById('online-list').innerHTML =
+        '<div class="empty-state"><div class="empty-icon">◎</div>No users online right now.</div>';
+      return;
+    }
+    document.getElementById('online-list').innerHTML = `
+      <table class="admin-table">
+        <thead><tr><th>USER</th><th>EMAIL</th><th>LAST SEEN</th></tr></thead>
+        <tbody>
+          ${data.map(u => `
+            <tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:.6rem">
+                  <span class="online-dot"></span>
+                  <strong>${esc(u.username)}</strong>
+                </div>
+              </td>
+              <td style="color:var(--muted);font-size:.78rem">${esc(u.email)}</td>
+              <td style="color:var(--muted);font-size:.75rem">${fmtDate(u.last_seen)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) { console.error('loadOnline failed:', e); }
+}
+
+// ── Activity ──────────────────────────────────────────────────────────────────
+async function loadActivity(uid) {
+  try {
+    const url = API + '?action=activity&limit=100'
+      + (actFilter ? '&filter=' + encodeURIComponent(actFilter) : '')
+      + (uid ? '&user_id=' + uid : '');
+    const data = await apiFetch(url).then(r => r.json());
+    document.getElementById('activity-table').innerHTML = renderActivityTable(data, false);
+  } catch(e) { console.error('loadActivity failed:', e); }
+}
+
+function filterActivity(f, btn) {
+  actFilter = f;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadActivity();
+}
+
+function viewUserActivity(uid) {
+  const btn = document.querySelector('[data-section="activity"]');
+  showSection('activity', btn);
+  loadActivity(uid);
+}
+
+function renderActivityTable(rows, compact) {
+  if (!Array.isArray(rows) || !rows.length)
+    return '<div class="empty-state"><div class="empty-icon">≡</div>No activity found.</div>';
+
+  const pillClass = a => {
+    const map = { login:'pill-login', logout:'pill-logout', register:'pill-register',
+                  download:'pill-download', banned:'pill-banned', unbanned:'pill-unbanned' };
+    return map[a] || 'pill-default';
+  };
+
+  return `
+    <table class="admin-table">
+      <thead><tr>
+        <th>TIME</th><th>USER</th><th>ACTION</th>
+        ${compact ? '' : '<th>DETAIL</th><th>IP</th>'}
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td style="color:var(--muted);white-space:nowrap;font-size:.75rem">${fmtDate(r.created_at)}</td>
+            <td><strong style="font-size:.82rem">${esc(r.username || '—')}</strong></td>
+            <td><span class="log-action-pill ${pillClass(r.action)}">${r.action.toUpperCase()}</span></td>
+            ${compact ? '' : `
+              <td style="color:var(--muted);font-size:.78rem">${esc(r.detail || '—')}</td>
+              <td style="color:#444;font-size:.7rem;font-family:monospace">${esc(r.ip || '—')}</td>`}
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function banUser(uid, banned) {
+  try {
+    const res = await apiFetch(API + '?action=ban', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id:uid, banned})
+    });
+    const d = await res.json();
+    if (d.success) { showToast(banned ? '⊘ User banned' : '✓ User unbanned'); loadUsers(); }
+    else showToast('Error: ' + (d.error || 'Unknown'));
+  } catch(e) { showToast('Request failed'); }
+}
+
+async function deleteUser(uid, username) {
+  if (!confirm(`Delete user "${username}"?\nThis cannot be undone.`)) return;
+  try {
+    const res = await apiFetch(API + '?action=delete_user', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id:uid})
+    });
+    const d = await res.json();
+    if (d.success) { showToast('✓ User deleted'); document.getElementById('urow-' + uid)?.remove(); }
+    else showToast('Error: ' + (d.error || 'Unknown'));
+  } catch(e) { showToast('Request failed'); }
+}
+
+async function doLogout() {
+  await apiFetch(AUTH + '?action=logout').catch(()=>{});
+  location.href = 'index.html';
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+function startAutoRefresh() {
+  countdownVal = 30;
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    countdownVal--;
+    const el = document.getElementById('countdown');
+    if (el) el.textContent = countdownVal;
+    if (countdownVal <= 0) {
+      countdownVal = 30;
+      if (currentSection === 'dashboard') loadDashboard();
+      if (currentSection === 'online')    loadOnline();
+    }
+  }, 1000);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function isOnline(lastSeen) {
+  if (!lastSeen) return false;
+  return (Date.now() - new Date(lastSeen).getTime()) < 15 * 60 * 1000;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return '—';
+  return dt.toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>
