@@ -212,8 +212,16 @@
     <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
     <button type="submit">⌕</button>
   </form>
-  <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
 </nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="index.html">Home</a>
+  <a href="search.html" class="active">Browse</a>
+  <a href="downloads.html">Downloads</a>
+</div>
 
 <div class="browse-layout">
 
@@ -345,6 +353,11 @@
 import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
 injectAuthModal();
 getUser().then(u => renderNavUser(u));
+</script>
+<script>
+document.getElementById('hamburger').addEventListener('click', function() {
+  document.getElementById('mobile-menu').classList.toggle('open');
+});
 </script>
 </body>
 </html>

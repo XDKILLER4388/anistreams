@@ -27,12 +27,19 @@
     <a href="index.html">Home</a>
     <a href="search.html">Browse</a>
   </div>
-  <form class="nav-search" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
-    <button type="submit">⌕</button>
-  </form>
-  <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <form class="nav-search" action="search.html" method="get">
+      <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
+      <button type="submit">⌕</button>
+    </form>
+    <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
 </nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="index.html">Home</a>
+  <a href="search.html">Browse</a>
+</div>
 
 <div class="detail-hero" id="detail-hero">
   <!-- Skeleton -->
@@ -253,6 +260,11 @@ window.toggleFavorite = (id, title, img) => {
 };
 
 init();
+</script>
+<script>
+document.getElementById('hamburger').addEventListener('click', function() {
+  document.getElementById('mobile-menu').classList.toggle('open');
+});
 </script>
 </body>
 </html>
