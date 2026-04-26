@@ -594,27 +594,19 @@ async function runSync() {
   }
 
   try {
-    const res  = await apiFetch('backend/cron/fetch_anime.php?secret=anistream_sync');
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch(e) {
-      logEl.innerHTML = `<span style="color:#f87171">Error: ${esc(text.substring(0,400))}</span>`;
-      return;
-    }
+    // Trigger background sync via admin API
+    const res  = await apiFetch('backend/api/admin.php?action=sync');
+    const data = await res.json();
 
     if (data.error) {
       logEl.innerHTML = `<span style="color:#f87171">Error: ${esc(data.error)}</span>`;
       return;
     }
 
-    logEl.innerHTML = (data.log || []).map(line => {
-      const color = line.includes('Error') ? '#f87171' : line.includes('Done') ? '#fbbf24' : '#4ade80';
-      return `<div style="color:${color}">${esc(line)}</div>`;
-    }).join('');
-    logEl.scrollTop = logEl.scrollHeight;
+    logEl.innerHTML = `<div style="color:#4ade80">✓ ${esc(data.message)}</div><div style="color:#555;margin-top:.5rem">Sync is running in the background. Check back in a few minutes — the anime list will update automatically.</div>`;
 
-    showToast(`✓ Sync done — +${data.inserted} new, ${data.updated} updated`);
-    loadDashboard(); // refresh stats
+    showToast('✓ Sync started in background');
+    setTimeout(() => loadDashboard(), 3000); // refresh stats after a moment
   } catch(e) {
     logEl.innerHTML = `<span style="color:#f87171">Sync failed: ${e.message}</span>`;
   } finally {
@@ -695,10 +687,11 @@ async function loadDashboard() {
     } catch(e) { console.error('Fetch failed', url, e); return null; }
   }
 
-  const [statsRes, actRes, onlineRes] = await Promise.all([
+  const [statsRes, actRes, onlineRes, syncRes] = await Promise.all([
     safeFetch(API + '?action=stats'),
     safeFetch(API + '?action=activity&limit=20'),
-    safeFetch(API + '?action=online')
+    safeFetch(API + '?action=online'),
+    safeFetch(API + '?action=sync_status'),
   ]);
 
   // Stats cards
@@ -727,11 +720,12 @@ async function loadDashboard() {
         <div class="val">${statsRes.today_logins ?? 0}</div>
         <div class="lbl">Logins Today</div>
       </div>
-      <div class="stat-card blue" onclick="navTo('activity')" title="View Downloads Activity">
+      <div class="stat-card blue" onclick="runSync()" title="Anime in DB — click to sync">
         <div class="stat-card-glow"></div>
-        <span class="stat-card-icon">↓</span>
-        <div class="val">${statsRes.total_downloads ?? 0}</div>
-        <div class="lbl">Downloads</div>
+        <span class="stat-card-icon">🎬</span>
+        <div class="val">${syncRes?.anime_count ?? '—'}</div>
+        <div class="lbl">Anime in DB</div>
+        <div class="trend" style="color:#555;font-size:.58rem">${syncRes?.last_sync ? 'Synced ' + fmtDate(syncRes.last_sync) : 'Never synced'}</div>
       </div>
       <div class="stat-card red" onclick="navTo('users')" title="View Banned Users">
         <div class="stat-card-glow"></div>

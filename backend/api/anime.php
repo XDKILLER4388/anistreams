@@ -98,9 +98,8 @@ if ($method === 'GET') {
              . ' ORDER BY score DESC LIMIT ? OFFSET ?';
 
         $stmt = db()->prepare($sql);
-        // bind string params, then LIMIT/OFFSET as INT
         $i = 1;
-        foreach (array_slice($params, 0, -2) as $p) {
+        foreach ($params as $p) {
             $stmt->bindValue($i++, $p, PDO::PARAM_STR);
         }
         $stmt->bindValue($i++, $limit,  PDO::PARAM_INT);
@@ -109,7 +108,7 @@ if ($method === 'GET') {
         $results = $stmt->fetchAll();
 
         $countStmt = db()->prepare('SELECT COUNT(*) FROM anime WHERE ' . implode(' AND ', $where));
-        $countStmt->execute(array_slice($params, 0, -2));
+        $countStmt->execute($params);
         $total = $countStmt->fetchColumn();
 
         json_response([

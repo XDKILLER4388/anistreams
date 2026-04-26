@@ -187,9 +187,13 @@ async function init() {
       const epMap = {};
       allEps.forEach(e => { if (!e.aired || new Date(e.aired) <= cutoff) epMap[e.mal_id] = e.title || null; });
 
-      if (isAiring && a.episodes > 0) {
-        // Airing: show all episodes up to total, Jikan titles where available
-        airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
+      if (isAiring) {
+        // Airing: only show episodes that have actually aired (in epMap)
+        airedEps = Object.keys(epMap).map(Number).sort((a, b) => a - b);
+        // Fallback: if Jikan returned no episode data but total is known, show up to total
+        if (!airedEps.length && a.episodes > 0) {
+          airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
+        }
       } else {
         airedEps = allEps
           .filter(e => !e.aired || new Date(e.aired) <= cutoff)

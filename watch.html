@@ -151,8 +151,18 @@ async function loadAllEps(){
   var epMap={};
   all.forEach(function(e){epMap[e.mal_id]=e.title||null;});
 
-  if(total>0){
-    // Always show all episodes up to the total — player works with any number
+  var isAiring=animeData&&animeData.status==='Currently Airing';
+  if(isAiring){
+    // Only show episodes that have actually aired (present in epMap)
+    var airedNums=Object.keys(epMap).map(Number).sort(function(a,b){return a-b;});
+    if(airedNums.length){
+      airedEps=airedNums.map(function(n){return{n:n,t:epMap[n]||('Episode '+n),d:null};});
+    } else if(total>0){
+      // Fallback if Jikan returned no episode data
+      airedEps=[];for(var i=1;i<=total;i++)airedEps.push({n:i,t:'Episode '+i,d:null});
+    }
+  } else if(total>0){
+    // Finished: show all episodes up to the total
     airedEps=[];
     for(var i=1;i<=total;i++){
       airedEps.push({n:i,t:epMap[i]||('Episode '+i),d:null});

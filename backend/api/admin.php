@@ -134,6 +134,41 @@ if ($action === 'delete_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     json_response(['success' => true]);
 }
 
+// ── Trigger anime sync ────────────────────────────────────────────────────────
+if ($action === 'sync') {
+    $script = realpath(__DIR__ . '/../cron/fetch_anime.php');
+    $php    = PHP_BINARY;
+    pclose(popen("start /B \"\" \"{$php}\" \"{$script}\"", 'r'));
+    try {
+        db()->prepare("INSERT INTO activity_log (action, detail, ip) VALUES (?,?,?)")
+            ->execute(['sync_triggered', 'Manual sync triggered by admin', $_SERVER['REMOTE_ADDR'] ?? '']);
+    } catch (Throwable $e) {}
+    json_response(['success' => true, 'message' => 'Sync started in background']);
+}
+
+// ── Sync status ───────────────────────────────────────────────────────────────
+if ($action === 'sync_status') {
+    try {
+        $last = db()->query("
+            SELECT detail, created_at FROM activity_log
+            WHERE action = 'sync'
+            ORDER BY created_at DESC LIMIT 1
+        ")->fetch();
+        $animeCount   = db()->query('SELECT COUNT(*) FROM anime')->fetchColumn();
+        $episodeCount = db()->query('SELECT COUNT(*) FROM episodes')->fetchColumn();
+        $airingCount  = db()->query("SELECT COUNT(*) FROM anime WHERE status='Currently Airing'")->fetchColumn();
+        json_response([
+            'last_sync'     => $last ? $last['created_at'] : null,
+            'last_detail'   => $last ? $last['detail'] : null,
+            'anime_count'   => (int)$animeCount,
+            'episode_count' => (int)$episodeCount,
+            'airing_count'  => (int)$airingCount,
+        ]);
+    } catch (Exception $e) {
+        json_response(['error' => $e->getMessage()], 500);
+    }
+}
+
 json_response(['error' => 'Unknown action'], 400);
 
 // ── Helper ────────────────────────────────────────────────────────────────────
