@@ -109,16 +109,22 @@ var ANILIST='https://graphql.anilist.co';
 var p=new URLSearchParams(location.search);
 var animeId=p.get('id');
 var epNum=parseInt(p.get('ep')||'1');
-var animeData=null,streamEps=[],airedEps=[],currentEp=epNum,alEpisodeCount=0;
+var animeData=null,streamEps=[],airedEps=[],currentEp=epNum,alEpisodeCount=0,alId=null;
 
-function providers(id,ep){return[
-  {n:'SUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/sub'},
-  {n:'DUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/dub'},
-  {n:'SUB 2', u:'https://megaplay.icu/stream/mal/'+id+'/'+ep+'/sub'},
-  {n:'DUB 2', u:'https://megaplay.icu/stream/mal/'+id+'/'+ep+'/dub'},
-  {n:'SUB 3', u:'https://player.megaplay.icu/'+id+'/'+ep+'/sub'},
-  {n:'DUB 3', u:'https://player.megaplay.icu/'+id+'/'+ep+'/dub'}
-];}
+function providers(id,ep,aid){
+  var base=[];
+  // MAL-based
+  base.push({n:'SUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/sub'});
+  base.push({n:'DUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/dub'});
+  // AniList-based fallbacks (different mapping, often works when MAL doesn't)
+  if(aid){
+    base.push({n:'SUB 2', u:'https://megaplay.buzz/stream/ani/'+aid+'/'+ep+'/sub'});
+    base.push({n:'DUB 2', u:'https://megaplay.buzz/stream/ani/'+aid+'/'+ep+'/dub'});
+  }
+  base.push({n:'SUB 3', u:'https://megaplay.icu/stream/mal/'+id+'/'+ep+'/sub'});
+  base.push({n:'DUB 3', u:'https://megaplay.icu/stream/mal/'+id+'/'+ep+'/dub'});
+  return base;
+}
 
 function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
 
@@ -178,10 +184,10 @@ async function boot(){
   try{
     var jR=await fetch(JIKAN+'/anime/'+animeId+'/full').then(function(r){return r.json();}).catch(function(){return null;});
     var aR=await fetch(ANILIST,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){title{romaji english}episodes coverImage{large}streamingEpisodes{title url site}externalLinks{site url}trailer{id}}}',variables:{id:parseInt(animeId)}})
+      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){id title{romaji english}episodes coverImage{large}streamingEpisodes{title url site}externalLinks{site url}trailer{id}}}',variables:{id:parseInt(animeId)}})
     }).then(function(r){return r.json();}).catch(function(){return null;});
     if(jR&&jR.data)animeData=jR.data;
-    if(aR&&aR.data&&aR.data.Media){streamEps=aR.data.Media.streamingEpisodes||[];alEpisodeCount=aR.data.Media.episodes||0;}
+    if(aR&&aR.data&&aR.data.Media){streamEps=aR.data.Media.streamingEpisodes||[];alEpisodeCount=aR.data.Media.episodes||0;alId=aR.data.Media.id||null;}
     renderInfo();renderBtns(epNum,0);
     await loadAllEps();
     renderList();
@@ -212,10 +218,10 @@ function findYT(ep){
 function mkIframe(src){
   return '<iframe src="'+src+'" allowfullscreen allow="autoplay;fullscreen;picture-in-picture;encrypted-media" sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen" style="width:100%;height:100%;border:none;display:block" loading="eager"></iframe>';
 }
-function renderEmbed(ep,idx){var w=document.getElementById('video-player');if(!w)return;var ps=providers(animeId,ep);w.innerHTML=mkIframe(ps[idx].u);badge('&#9654; '+ps[idx].n,'#4ade80');}
+function renderEmbed(ep,idx){var w=document.getElementById('video-player');if(!w)return;var ps=providers(animeId,ep,alId);w.innerHTML=mkIframe(ps[idx].u);badge('&#9654; '+ps[idx].n,'#4ade80');}
 function renderYT(vid,src){var w=document.getElementById('video-player');if(!w)return;w.innerHTML=mkIframe('https://www.youtube.com/embed/'+vid+'?autoplay=1&rel=0&modestbranding=1');badge('&#9654; '+src+' (Free)','#4ade80');}
 function renderBtns(ep,ai){
-  var ps=providers(animeId,ep);var h='';
+  var ps=providers(animeId,ep,alId);var h='';
   for(var i=0;i<ps.length;i++)h+='<button onclick="switchSrv('+i+')" class="btn '+(i===ai?'btn-primary':'btn-ghost')+'" style="font-size:.65rem;padding:.4rem .9rem;letter-spacing:1px">'+ps[i].n+'</button>';
   document.getElementById('server-selector').innerHTML=h;
 }
