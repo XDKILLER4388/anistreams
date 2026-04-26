@@ -190,7 +190,20 @@ async function init() {
       if (isAiring) {
         // Airing: only show episodes that have actually aired (in epMap)
         airedEps = Object.keys(epMap).map(Number).sort((a, b) => a - b);
-        // Fallback: if Jikan returned no episode data but total is known, show up to total
+
+        // Jikan lags — also check Consumet/hianime for a higher episode count
+        try {
+          const { searchConsumet, getConsumetEpisodes } = await import('./js/api.js');
+          const consumetInfo = await searchConsumet(a.title);
+          if (consumetInfo) {
+            const consumetEps = await getConsumetEpisodes(consumetInfo);
+            if (consumetEps.length > airedEps.length) {
+              airedEps = Array.from({ length: consumetEps.length }, (_, i) => i + 1);
+            }
+          }
+        } catch(e) {}
+
+        // Fallback: if still nothing and total is known, show up to total
         if (!airedEps.length && a.episodes > 0) {
           airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
         }
