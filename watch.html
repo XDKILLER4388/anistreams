@@ -13,6 +13,11 @@
 .server-label{font-size:.7rem;letter-spacing:2px;color:var(--muted)}
 #source-badge{display:none;font-size:.72rem;letter-spacing:1px;margin-top:.3rem}
 .ep-item{cursor:pointer}
+.ctrl-btn{background:none;border:1px solid #333;color:var(--muted);border-radius:20px;padding:.3rem .85rem;font-size:.7rem;cursor:pointer;letter-spacing:.5px;transition:all .2s;white-space:nowrap}
+.ctrl-btn:hover{border-color:#555;color:var(--text)}
+.ctrl-btn.ctrl-active{border-color:#e85d04;color:#e85d04}
+body.focus-mode nav,body.focus-mode footer,body.focus-mode .watch-layout>div:last-child,body.focus-mode #current-ep-label,body.focus-mode .watch-meta{display:none!important}
+body.focus-mode .watch-layout{grid-template-columns:1fr}
 /* Download modal */
 #dl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center}
 #dl-modal.open{display:flex}
@@ -66,6 +71,15 @@
 <a id="anime-link" href="#" class="btn btn-ghost" style="font-size:.75rem">INFO</a>
 <button onclick="openDlModal()" class="btn btn-ghost" style="font-size:.75rem">&#11015; DOWNLOAD</button>
 </div>
+</div>
+<!-- Controls bar -->
+<div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;padding:.6rem 0;border-top:1px solid var(--border);margin-top:.6rem">
+<button id="btn-focus" onclick="toggleFocus()" class="ctrl-btn" title="Hide everything except the player">&#9790; Focus</button>
+<button id="btn-autonext" onclick="toggleAutoNext()" class="ctrl-btn ctrl-active" title="Auto-play next episode when current ends">&#9654;&#9654; AutoNext</button>
+<button id="btn-autoplay" onclick="toggleAutoPlay()" class="ctrl-btn" title="Auto-play on load">&#9654; AutoPlay</button>
+<button id="btn-autoskip" onclick="toggleAutoSkip()" class="ctrl-btn" title="Auto-skip intro (when supported)">&#10006; AutoSkip</button>
+<button class="ctrl-btn" onclick="prevEp()">&#8676; Prev</button>
+<button class="ctrl-btn" onclick="nextEp()">Next &#8677;</button>
 </div>
 <div style="display:flex;gap:1rem;margin-top:1rem;align-items:center;padding-top:.8rem;border-top:1px solid var(--border)">
 <img id="watch-poster" src="" alt="" style="width:56px;height:80px;object-fit:cover;border-radius:5px;border:1px solid var(--border);flex-shrink:0">
@@ -308,7 +322,42 @@ async function fetchSources(){
     +'<span style="font-size:.88rem;font-weight:600">DUB</span><span style="font-size:.7rem;color:var(--muted)">Stream</span><span style="font-size:.75rem;color:#4ade80">&#9654; Open</span></a>';
 }
 
+// ── Controls ──────────────────────────────────────────────────────────────────
+var autoNext = JSON.parse(localStorage.getItem('autoNext') ?? 'true');
+var autoPlay = JSON.parse(localStorage.getItem('autoPlay') ?? 'false');
+var autoSkip = JSON.parse(localStorage.getItem('autoSkip') ?? 'false');
+var focusMode = false;
+
+function updateCtrlBtns(){
+  document.getElementById('btn-autonext').className='ctrl-btn'+(autoNext?' ctrl-active':'');
+  document.getElementById('btn-autoplay').className='ctrl-btn'+(autoPlay?' ctrl-active':'');
+  document.getElementById('btn-autoskip').className='ctrl-btn'+(autoSkip?' ctrl-active':'');
+  document.getElementById('btn-focus').className='ctrl-btn'+(focusMode?' ctrl-active':'');
+}
+function toggleAutoNext(){autoNext=!autoNext;localStorage.setItem('autoNext',autoNext);updateCtrlBtns();}
+function toggleAutoPlay(){autoPlay=!autoPlay;localStorage.setItem('autoPlay',autoPlay);updateCtrlBtns();}
+function toggleAutoSkip(){autoSkip=!autoSkip;localStorage.setItem('autoSkip',autoSkip);updateCtrlBtns();}
+function toggleFocus(){focusMode=!focusMode;document.body.classList.toggle('focus-mode',focusMode);updateCtrlBtns();}
+
+// Listen for episode complete from megaplay iframe
+window.addEventListener('message',function(e){
+  var data=e.data;
+  if(typeof data==='string'){try{data=JSON.parse(data);}catch(ex){return;}}
+  if(!data)return;
+  // AutoSkip intro
+  if(autoSkip&&data.event==='intro'&&data.end){
+    var iframe=document.querySelector('#video-player iframe');
+    if(iframe)iframe.contentWindow.postMessage(JSON.stringify({channel:'megacloud',action:'seek',time:data.end}),iframe.src.split('/').slice(0,3).join('/'));
+  }
+  // AutoNext on complete
+  if(autoNext&&(data.event==='complete'||data.type==='complete')){
+    setTimeout(function(){nextEp();},1200);
+  }
+});
+
 boot();
+// Sync button states after page loads
+document.addEventListener('DOMContentLoaded',function(){updateCtrlBtns();});
 </script>
 <script type="module">
 import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
