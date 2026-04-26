@@ -7,11 +7,8 @@ session_start();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Auth required for all download endpoints
-if (empty($_SESSION['user_id'])) {
-    json_response(['error' => 'Login required to download'], 401);
-}
-$uid = $_SESSION['user_id'];
+// Use session user if logged in, otherwise use a guest identifier
+$uid = $_SESSION['user_id'] ?? 0;
 
 // ── Add download ──────────────────────────────────────────────────────────────
 if ($method === 'POST') {

@@ -74,17 +74,6 @@ async function init() {
   const grid = document.getElementById('dl-grid');
   const count = document.getElementById('dl-count');
 
-  if (!user) {
-    grid.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
-        <div class="icon">🔒</div>
-        <p style="font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:2px;margin-bottom:1rem">LOGIN REQUIRED</p>
-        <p style="margin-bottom:1.5rem">You need an account to view and manage downloads.</p>
-        <button onclick="document.getElementById('auth-modal').style.display='flex'" class="btn btn-primary">LOGIN / REGISTER</button>
-      </div>`;
-    return;
-  }
-
   try {
     const res = await fetch('backend/api/downloads.php');
     const downloads = await res.json();
