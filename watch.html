@@ -109,7 +109,7 @@ var ANILIST='https://graphql.anilist.co';
 var p=new URLSearchParams(location.search);
 var animeId=p.get('id');
 var epNum=parseInt(p.get('ep')||'1');
-var animeData=null,streamEps=[],airedEps=[],currentEp=epNum;
+var animeData=null,streamEps=[],airedEps=[],currentEp=epNum,alEpisodeCount=0;
 
 function providers(id,ep){return[
   {n:'SUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/sub'},
@@ -147,49 +147,25 @@ async function loadAllEps(){
     }
   }catch(e){console.warn(e);}
 
-  var total=(animeData&&animeData.episodes)||0;
+  var malTotal=(animeData&&animeData.episodes)||0;
+  var alTotal=alEpisodeCount||0;
   var epMap={};
   all.forEach(function(e){epMap[e.mal_id]=e.title||null;});
 
+  var cutoff=new Date();cutoff.setDate(cutoff.getDate()+7);
   var isAiring=animeData&&animeData.status==='Currently Airing';
-  if(isAiring){
-    // Only show episodes that have actually aired (present in epMap)
-    var airedNums=Object.keys(epMap).map(Number).sort(function(a,b){return a-b;});
-    if(airedNums.length){
-      airedEps=airedNums.map(function(n){return{n:n,t:epMap[n]||('Episode '+n),d:null};});
-    }
-    // Jikan lags — check Consumet/hianime for a higher count
-    try{
-      var cTitle=encodeURIComponent((animeData.title_english||animeData.title||''));
-      var cRes=await fetch('http://localhost:3000/anime/hianime/'+cTitle);
-      var cData=await cRes.json();
-      var cResults=cData.animes||cData.results||[];
-      var clean=(animeData.title_english||animeData.title||'').toLowerCase().split(':')[0].trim();
-      var cMatch=cResults.find(function(r){return(r.name||r.title||'').toLowerCase().includes(clean);})||cResults[0];
-      if(cMatch&&cMatch.id){
-        var infoRes=await fetch('http://localhost:3000/anime/hianime/info?id='+encodeURIComponent(cMatch.id));
-        var infoData=await infoRes.json();
-        var cEps=(infoData.seasons&&infoData.seasons[0]&&infoData.seasons[0].episodes)||infoData.episodes||[];
-        if(cEps.length>airedEps.length){
-          airedEps=[];for(var i=1;i<=cEps.length;i++)airedEps.push({n:i,t:'Episode '+i,d:null});
-        }
-      }
-    }catch(e){}
-    // Final fallback
-    if(!airedEps.length&&total>0){
-      airedEps=[];for(var i=1;i<=total;i++)airedEps.push({n:i,t:'Episode '+i,d:null});
-    }
-  } else if(total>0){
-    // Finished: show all episodes up to the total
+
+  var jikanAired=all.filter(function(e){return !e.aired||new Date(e.aired)<=cutoff;}).length;
+  // Best count = max of all sources
+  var epCount=Math.max(jikanAired, malTotal, alTotal);
+
+  if(epCount>0){
     airedEps=[];
-    for(var i=1;i<=total;i++){
+    for(var i=1;i<=epCount;i++){
       airedEps.push({n:i,t:epMap[i]||('Episode '+i),d:null});
     }
   } else if(all.length){
-    var cutoff=new Date();cutoff.setDate(cutoff.getDate()+7);
-    airedEps=all
-      .filter(function(e){return !e.aired||new Date(e.aired)<=cutoff;})
-      .map(function(e){return{n:e.mal_id,t:e.title||('Episode '+e.mal_id),d:e.aired||null};});
+    airedEps=all.map(function(e){return{n:e.mal_id,t:e.title||('Episode '+e.mal_id),d:e.aired||null};});
   }
 }
 
@@ -202,10 +178,10 @@ async function boot(){
   try{
     var jR=await fetch(JIKAN+'/anime/'+animeId+'/full').then(function(r){return r.json();}).catch(function(){return null;});
     var aR=await fetch(ANILIST,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){title{romaji english}coverImage{large}streamingEpisodes{title url site}externalLinks{site url}trailer{id}}}',variables:{id:parseInt(animeId)}})
+      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){title{romaji english}episodes coverImage{large}streamingEpisodes{title url site}externalLinks{site url}trailer{id}}}',variables:{id:parseInt(animeId)}})
     }).then(function(r){return r.json();}).catch(function(){return null;});
     if(jR&&jR.data)animeData=jR.data;
-    if(aR&&aR.data&&aR.data.Media)streamEps=aR.data.Media.streamingEpisodes||[];
+    if(aR&&aR.data&&aR.data.Media){streamEps=aR.data.Media.streamingEpisodes||[];alEpisodeCount=aR.data.Media.episodes||0;}
     renderInfo();renderBtns(epNum,0);
     await loadAllEps();
     renderList();

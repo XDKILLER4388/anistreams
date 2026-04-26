@@ -155,7 +155,6 @@ async function init() {
     epGrid.innerHTML = `<p style="color:var(--muted);font-size:.82rem">Loading episodes…</p>`;
 
     let airedEps = [];
-    const todayEp = new Date(); todayEp.setHours(0,0,0,0);
 
     async function fetchEpPage(page, retries = 3) {
       for (let attempt = 0; attempt < retries; attempt++) {
@@ -182,45 +181,39 @@ async function init() {
         if (data?.data) allEps = allEps.concat(data.data);
       }
 
-      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 7);
       const isAiring = a.status === 'Currently Airing';
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 7);
+
+      // Build episode map from Jikan (titles)
       const epMap = {};
-      allEps.forEach(e => { if (!e.aired || new Date(e.aired) <= cutoff) epMap[e.mal_id] = e.title || null; });
+      allEps.forEach(e => { epMap[e.mal_id] = e.title || null; });
 
+      // Best episode count: max of Jikan list, MAL total, AniList episodes
+      const jikanCount  = allEps.filter(e => !e.aired || new Date(e.aired) <= cutoff).length;
+      const malTotal    = a.episodes || 0;
+      const alEpisodes  = al?.episodes || 0;
+      let epCount = Math.max(jikanCount, malTotal, alEpisodes);
+
+      // For airing: don't show future episodes beyond what Jikan has aired
+      // but trust AniList/MAL count if Jikan is lagging
       if (isAiring) {
-        // Airing: only show episodes that have actually aired (in epMap)
-        airedEps = Object.keys(epMap).map(Number).sort((a, b) => a - b);
+        const airedFromJikan = allEps.filter(e => !e.aired || new Date(e.aired) <= cutoff).map(e => e.mal_id);
+        epCount = Math.max(airedFromJikan.length, alEpisodes > 0 ? alEpisodes : 0);
+        // If AniList says more eps than Jikan has indexed, trust AniList
+        if (epCount === 0 && malTotal > 0) epCount = malTotal;
+      }
 
-        // Jikan lags — also check Consumet/hianime for a higher episode count
-        try {
-          const { searchConsumet, getConsumetEpisodes } = await import('./js/api.js');
-          const consumetInfo = await searchConsumet(a.title);
-          if (consumetInfo) {
-            const consumetEps = await getConsumetEpisodes(consumetInfo);
-            if (consumetEps.length > airedEps.length) {
-              airedEps = Array.from({ length: consumetEps.length }, (_, i) => i + 1);
-            }
-          }
-        } catch(e) {}
-
-        // Fallback: if still nothing and total is known, show up to total
-        if (!airedEps.length && a.episodes > 0) {
-          airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
-        }
-      } else {
-        airedEps = allEps
-          .filter(e => !e.aired || new Date(e.aired) <= cutoff)
-          .map(e => e.mal_id);
-        // Finished but Jikan list is short — use total
-        if (a.status === 'Finished Airing' && a.episodes > 0 && airedEps.length < a.episodes) {
-          airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
-        }
+      if (epCount > 0) {
+        airedEps = Array.from({ length: epCount }, (_, i) => i + 1);
+      } else if (allEps.length > 0) {
+        airedEps = allEps.map(e => e.mal_id);
       }
     } catch(e) {}
 
-    // Fallback: if Jikan has no episode list, use total count
-    if (!airedEps.length && a.episodes > 0 && a.status !== 'Currently Airing') {
-      airedEps = Array.from({ length: a.episodes }, (_, i) => i + 1);
+    // Final fallback — use MAL total or AniList
+    if (!airedEps.length) {
+      const fallback = Math.max(a.episodes || 0, al?.episodes || 0);
+      if (fallback > 0) airedEps = Array.from({ length: fallback }, (_, i) => i + 1);
     }
 
     const airedCount = airedEps.length;
