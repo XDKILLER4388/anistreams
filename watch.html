@@ -302,28 +302,28 @@ document.getElementById('dl-modal').addEventListener('click',function(e){if(e.ta
 async function fetchSources(){
   var body=document.getElementById('dl-body');
   var title=(animeData&&(animeData.title_english||animeData.title))||'Anime';
-  var epObj=null;for(var i=0;i<airedEps.length;i++){if(airedEps[i].n===currentEp){epObj=airedEps[i];break;}}
-  var safe=(title+' - Episode '+currentEp).replace(/[\/\\?%*:|"<>]/g,'-');
+  var safe=title.replace(/[\/\\?%*:|"<>]/g,'-');
+  var streamUrl='https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/sub';
+  var cmd='yt-dlp "'+streamUrl+'" -o "'+safe+' - Episode '+currentEp+'.mp4"';
 
-  // Build sources directly from embed providers — no PHP needed
-  var srcs=[
-    {label:'SUB',  url:'https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/sub'},
-    {label:'DUB',  url:'https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/dub'},
-    {label:'SUB 2',url:'https://megaplay.icu/stream/mal/'+animeId+'/'+currentEp+'/sub'},
-    {label:'DUB 2',url:'https://megaplay.icu/stream/mal/'+animeId+'/'+currentEp+'/dub'},
-  ];
+  body.innerHTML=
+    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:1rem"><strong style="color:var(--text)">'+title+'</strong> &mdash; Episode '+currentEp+'</p>'
 
-  var rows='<p style="font-size:.78rem;color:var(--muted);margin-bottom:1rem"><strong style="color:var(--text)">'+title+'</strong> &mdash; Episode '+currentEp+'</p>';
-  for(var i=0;i<srcs.length;i++){
-    var s=srcs[i];
-    rows+='<a href="'+s.url+'" target="_blank" rel="noopener" class="dl-row">'
-      +'<span style="font-size:.88rem;font-weight:600">'+s.label+'</span>'
-      +'<span style="font-size:.7rem;color:var(--muted)">Stream</span>'
-      +'<span style="font-size:.75rem;color:#4ade80">&#9654; Open</span>'
-      +'</a>';
-  }
-  rows+='<p style="font-size:.68rem;color:#555;margin-top:1rem;line-height:1.6">Opens stream in a new tab. Use your browser\'s video downloader extension to save.</p>';
-  body.innerHTML=rows;
+    // yt-dlp command box
+    +'<p style="font-size:.7rem;letter-spacing:1px;color:var(--muted);margin-bottom:.4rem">YT-DLP COMMAND</p>'
+    +'<div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:.75rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem">'
+    +'<code id="ytdlp-cmd" style="font-size:.7rem;color:#4ade80;flex:1;word-break:break-all;line-height:1.6">'+cmd+'</code>'
+    +'<button onclick="var c=document.getElementById(\'ytdlp-cmd\');navigator.clipboard.writeText(c.textContent);this.textContent=\'Copied!\';setTimeout(()=>this.textContent=\'Copy\',2000)" '
+    +'style="background:#222;border:1px solid #444;color:#fff;border-radius:4px;padding:.3rem .7rem;font-size:.7rem;cursor:pointer;white-space:nowrap">Copy</button>'
+    +'</div>'
+    +'<p style="font-size:.68rem;color:#555;margin-bottom:1.25rem;line-height:1.6">Paste this in your terminal to download. Requires <a href="https://github.com/yt-dlp/yt-dlp/releases/latest" target="_blank" style="color:#4ade80">yt-dlp</a>.</p>'
+
+    // Stream links
+    +'<p style="font-size:.7rem;letter-spacing:1px;color:var(--muted);margin-bottom:.4rem">STREAM IN BROWSER</p>'
+    +'<a href="https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/sub" target="_blank" rel="noopener" class="dl-row">'
+    +'<span style="font-size:.88rem;font-weight:600">SUB</span><span style="font-size:.7rem;color:var(--muted)">Stream</span><span style="font-size:.75rem;color:#4ade80">&#9654; Open</span></a>'
+    +'<a href="https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/dub" target="_blank" rel="noopener" class="dl-row" style="margin-top:.4rem">'
+    +'<span style="font-size:.88rem;font-weight:600">DUB</span><span style="font-size:.7rem;color:var(--muted)">Stream</span><span style="font-size:.75rem;color:#4ade80">&#9654; Open</span></a>';
 }
 
 boot();
