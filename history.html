@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watch History — AniStream</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .history-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+    .history-card {
+      background:var(--card); border:1px solid var(--border); border-radius:8px;
+      display:flex; gap:1rem; padding:.8rem; align-items:flex-start;
+      transition:border-color .2s; position:relative;
+    }
+    .history-card:hover { border-color:rgba(255,255,255,.2); }
+    .history-cover {
+      width:56px; height:80px; object-fit:cover; border-radius:5px;
+      flex-shrink:0; border:1px solid var(--border);
+    }
+    .history-info { flex:1; min-width:0; }
+    .history-title { font-size:.9rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:.2rem; }
+    .history-ep { font-size:.78rem; color:var(--muted); margin-bottom:.2rem; }
+    .history-time { font-size:.68rem; color:#555; margin-bottom:.6rem; }
+    .history-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .history-eps { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.5rem; }
+    .history-ep-dot {
+      width:24px; height:24px; border-radius:4px; background:var(--surface);
+      border:1px solid var(--border); font-size:.6rem; display:flex;
+      align-items:center; justify-content:center; color:var(--muted);
+      cursor:pointer; text-decoration:none; transition:all .2s;
+    }
+    .history-ep-dot.watched { border-color:#4ade80; color:#4ade80; background:rgba(74,222,128,.08); }
+    .history-ep-dot:hover { border-color:#fff; color:#fff; }
+    .empty-state { text-align:center; padding:4rem 2rem; color:var(--muted); }
+    .empty-state .icon { font-size:3rem; margin-bottom:1rem; }
+    .clear-btn { background:none; border:1px solid #f87171; color:#f87171; border-radius:6px; padding:.4rem 1rem; font-size:.72rem; cursor:pointer; letter-spacing:1px; transition:all .2s; }
+    .clear-btn:hover { background:#f87171; color:#000; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">ANISTREAM</a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="search.html">Browse</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <form class="nav-search" action="search.html" method="get">
+      <input type="text" name="q" placeholder="Search anime..." autocomplete="off">
+      <button type="submit">⌕</button>
+    </form>
+    <div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="index.html">Home</a>
+  <a href="search.html">Browse</a>
+</div>
+
+<div style="padding:2rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div>
+      <h1 style="font-family:'Orbitron',sans-serif;font-size:1rem;letter-spacing:3px">WATCH HISTORY</h1>
+      <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Stored in your browser — clears with browser data</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <span id="history-count" style="font-size:.8rem;color:var(--muted)"></span>
+      <button class="clear-btn" onclick="clearHistory()">✕ CLEAR ALL</button>
+    </div>
+  </div>
+
+  <div class="history-grid" id="history-grid">
+    <div class="skeleton" style="height:100px;border-radius:8px"></div>
+    <div class="skeleton" style="height:100px;border-radius:8px"></div>
+    <div class="skeleton" style="height:100px;border-radius:8px"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-logo">ANISTREAM</div>
+  <p>Metadata by <a href="https://jikan.moe" target="_blank" rel="noopener" style="color:var(--text)">Jikan</a></p>
+</footer>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
+injectAuthModal();
+getUser().then(u => renderNavUser(u));
+</script>
+
+<script>
+document.getElementById('hamburger').addEventListener('click', function() {
+  document.getElementById('mobile-menu').classList.toggle('open');
+});
+
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return m + 'm ago';
+  if (h < 24) return h + 'h ago';
+  if (d < 7) return d + 'd ago';
+  return new Date(ts).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function getWatchedEps(animeId) {
+  try { return JSON.parse(localStorage.getItem('watched_' + animeId) || '[]'); } catch(e) { return []; }
+}
+
+function removeEntry(animeId) {
+  const history = JSON.parse(localStorage.getItem('watch_history') || '[]');
+  const updated = history.filter(h => h.id != animeId);
+  localStorage.setItem('watch_history', JSON.stringify(updated));
+  document.getElementById('card-' + animeId)?.remove();
+  const remaining = document.querySelectorAll('[id^="card-"]').length;
+  document.getElementById('history-count').textContent = remaining + ' anime';
+  if (!remaining) renderEmpty();
+  showToast('Removed from history');
+}
+
+function clearHistory() {
+  if (!confirm('Clear all watch history?')) return;
+  localStorage.removeItem('watch_history');
+  renderEmpty();
+  document.getElementById('history-count').textContent = '0 anime';
+  showToast('History cleared');
+}
+
+function renderEmpty() {
+  document.getElementById('history-grid').innerHTML = `
+    <div class="empty-state" style="grid-column:1/-1">
+      <div class="icon">📺</div>
+      <p style="font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:2px;margin-bottom:1rem">NO HISTORY YET</p>
+      <p style="margin-bottom:1.5rem">Start watching anime and your history will appear here.</p>
+      <a href="index.html" class="btn btn-primary">BROWSE ANIME</a>
+    </div>`;
+}
+
+function init() {
+  const history = JSON.parse(localStorage.getItem('watch_history') || '[]');
+  const grid = document.getElementById('history-grid');
+  const countEl = document.getElementById('history-count');
+
+  if (!history.length) { renderEmpty(); countEl.textContent = '0 anime'; return; }
+
+  countEl.textContent = history.length + ' anime';
+
+  grid.innerHTML = history.map(h => {
+    const watchedEps = getWatchedEps(h.id);
+    const epDots = watchedEps.length > 0
+      ? `<div style="margin-top:.5rem">
+          <div style="font-size:.65rem;color:var(--muted);margin-bottom:.3rem;letter-spacing:1px">${watchedEps.length} EPISODE${watchedEps.length!==1?'S':''} WATCHED</div>
+          <div class="history-eps">
+            ${watchedEps.sort((a,b)=>a-b).slice(0,20).map(n =>
+              `<a href="watch.html?id=${h.id}&ep=${n}" class="history-ep-dot watched" title="Episode ${n}">${String(n).padStart(2,'0')}</a>`
+            ).join('')}
+            ${watchedEps.length > 20 ? `<span class="history-ep-dot" style="cursor:default">+${watchedEps.length-20}</span>` : ''}
+          </div>
+        </div>`
+      : '';
+
+    return `
+    <div class="history-card" id="card-${h.id}">
+      <a href="anime.html?id=${h.id}&src=mal">
+        <img class="history-cover" src="${h.img || ''}" alt="${h.title || ''}"
+          onerror="this.src='https://via.placeholder.com/56x80/111/444?text=?'">
+      </a>
+      <div class="history-info">
+        <div class="history-title" title="${h.title || ''}">${h.title || 'Unknown'}</div>
+        <div class="history-ep">Last watched: Episode ${h.ep}</div>
+        <div class="history-time">${timeAgo(h.ts)}</div>
+        <div class="history-actions">
+          <a href="watch.html?id=${h.id}&ep=${h.ep}" class="btn btn-primary" style="font-size:.65rem;padding:.3rem .7rem">▶ Continue</a>
+          <a href="watch.html?id=${h.id}&ep=1" class="btn btn-ghost" style="font-size:.65rem;padding:.3rem .7rem">↩ Restart</a>
+          <a href="anime.html?id=${h.id}&src=mal" class="btn btn-ghost" style="font-size:.65rem;padding:.3rem .7rem">ℹ Info</a>
+          <button onclick="removeEntry('${h.id}')" class="btn btn-ghost" style="font-size:.65rem;padding:.3rem .7rem;color:#f87171;border-color:#f87171">✕</button>
+        </div>
+        ${epDots}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>
