@@ -14,6 +14,8 @@
 .server-label{font-size:.7rem;letter-spacing:2px;color:var(--muted)}
 #source-badge{display:none;font-size:.72rem;letter-spacing:1px;margin-top:.3rem}
 .ep-item{cursor:pointer}
+.ep-item.watched{opacity:.6}
+.ep-item.watched .ep-num{color:#4ade80}
 .ctrl-btn{background:none;border:1px solid #333;color:var(--muted);border-radius:20px;padding:.3rem .85rem;font-size:.7rem;cursor:pointer;letter-spacing:.5px;transition:all .2s;white-space:nowrap}
 .ctrl-btn:hover{border-color:#555;color:var(--text)}
 .ctrl-btn.ctrl-active{border-color:#e85d04;color:#e85d04}
@@ -205,6 +207,7 @@ async function boot(){
     if(aR&&aR.data&&aR.data.Media){streamEps=aR.data.Media.streamingEpisodes||[];alEpisodeCount=aR.data.Media.episodes||0;alId=aR.data.Media.id||null;}
     renderInfo();renderBtns(epNum,0);
     await loadAllEps();
+    markWatched(epNum);
     renderList();
     var tgt=airedEps.find(function(e){return e.n===epNum;})?epNum:(airedEps[0]?airedEps[0].n:1);
     if(tgt!==epNum)loadEp(tgt,false);
@@ -259,12 +262,20 @@ function renderList(){
   el.innerHTML=h;
   setTimeout(function(){var e=document.getElementById('ep-item-'+currentEp);if(e)e.scrollIntoView({block:'center',behavior:'smooth'});},80);
 }
+// ── Watched episodes (per anime, stored in localStorage) ─────────────────────
+function watchedKey(){return 'watched_'+animeId;}
+function getWatched(){try{return JSON.parse(localStorage.getItem(watchedKey())||'[]');}catch(e){return[];}}
+function markWatched(ep){try{var w=getWatched();if(w.indexOf(ep)<0){w.push(ep);localStorage.setItem(watchedKey(),JSON.stringify(w));}}catch(e){}}
+function isWatched(ep){return getWatched().indexOf(ep)>=0;}
+
 function epItem(ep){
-  var act=ep.n===currentEp;var yt=!!findYT(ep.n);
+  var act=ep.n===currentEp;
+  var yt=!!findYT(ep.n);
+  var watched=isWatched(ep.n);
   var ds=ep.d?new Date(ep.d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
-  return '<div class="ep-item '+(act?'active':'')+'" id="ep-item-'+ep.n+'" onclick="loadEp('+ep.n+')" role="button" tabindex="0">'
-    +'<span class="ep-num">'+String(ep.n).padStart(2,'0')+'</span>'
-    +'<div style="flex:1;min-width:0"><div class="ep-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ep.t+'</div>'
+  return '<div class="ep-item '+(act?'active':'')+(watched&&!act?' watched':'')+'" id="ep-item-'+ep.n+'" onclick="loadEp('+ep.n+')" role="button" tabindex="0">'
+    +'<span class="ep-num">'+String(ep.n).padStart(2,'0')+(watched&&!act?' <span style="color:#4ade80;font-size:.55rem">✓</span>':'')+'</span>'
+    +'<div style="flex:1;min-width:0"><div class="ep-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'+(watched&&!act?'color:#888':'')+'">'+ep.t+'</div>'
     +'<div style="font-size:.58rem;color:'+(yt?'#4ade80':'#555')+';margin-top:1px">'+(yt?'&#9679; FREE &middot; ':'')+ds+'</div>'
     +'</div></div>';
 }
@@ -276,7 +287,13 @@ function loadEp(n,push){
   var e=document.getElementById('ep-item-'+n);if(e){e.classList.add('active');e.scrollIntoView({block:'nearest',behavior:'smooth'});}
   document.getElementById('current-ep-label').textContent='Episode '+n;
   var yt=findYT(n);if(yt){renderYT(yt.id,yt.s);renderBtns(n,-1);}else{renderEmbed(n,0);renderBtns(n,0);}
+  markWatched(n);
   saveH(n);
+  // Refresh list to update watched indicators without full re-render
+  document.querySelectorAll('.ep-item').forEach(function(el){
+    var num=parseInt(el.id.replace('ep-item-',''));
+    if(isWatched(num)&&num!==currentEp){el.classList.add('watched');}
+  });
 }
 function switchSrv(i){renderEmbed(currentEp,i);renderBtns(currentEp,i);}
 function prevEp(){var idx=-1;for(var i=0;i<airedEps.length;i++){if(airedEps[i].n===currentEp){idx=i;break;}}if(idx>0)loadEp(airedEps[idx-1].n);}

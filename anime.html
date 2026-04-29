@@ -224,9 +224,11 @@ async function init() {
         ? `${airedCount} aired / ${a.episodes || '?'} total`
         : `${airedCount} episodes`;
 
+      const watchedEps = (() => { try { return JSON.parse(localStorage.getItem('watched_'+id)||'[]'); } catch(e) { return []; } })();
+
       epGrid.innerHTML = `<div class="episodes-grid">
         ${airedEps.map(n =>
-          `<a href="watch.html?id=${id}&ep=${n}" class="ep-btn">${String(n).padStart(2,'0')}</a>`
+          `<a href="watch.html?id=${id}&ep=${n}" class="ep-btn${watchedEps.indexOf(n)>=0?' ep-btn-watched':''}" title="${watchedEps.indexOf(n)>=0?'Watched':''}">${String(n).padStart(2,'0')}${watchedEps.indexOf(n)>=0?'<span style="font-size:.5rem;vertical-align:super;color:#4ade80">✓</span>':''}</a>`
         ).join('')}
       </div>`;
 

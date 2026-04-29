@@ -306,6 +306,11 @@ nav {
   color: var(--bg);
   border-color: var(--text);
 }
+.ep-btn-watched {
+  opacity: 0.5;
+  border-color: #4ade80;
+  color: #4ade80;
+}
 
 /* WATCH PAGE */
 .watch-layout {
