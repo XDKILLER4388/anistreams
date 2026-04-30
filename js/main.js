@@ -79,45 +79,58 @@ async function initHome() {
     trendingGrid.innerHTML = `<p style="color:var(--muted);grid-column:1/-1">Failed to load trending. ${e.message}</p>`;
   }
 
-  // Season now
+  // Season now — use AniList (no rate limit)
   if (seasonGrid) {
     try {
-      const season = await getSeasonNow(12);
-      if (season && season.length) {
-        seasonGrid.innerHTML = season.map(a => renderCard(a)).join('');
+      const query = `query {
+        Page(page: 1, perPage: 12) {
+          media(type: ANIME, season: SPRING, seasonYear: 2025, sort: POPULARITY_DESC, isAdult: false) {
+            id idMal title { romaji english }
+            coverImage { large extraLarge }
+            episodes averageScore status
+          }
+        }
+      }`;
+      const r = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const d = await r.json();
+      const items = d.data?.Page?.media || [];
+      if (items.length) {
+        seasonGrid.innerHTML = items.map(a => renderCard(normalizeAniList(a))).join('');
       } else {
-        // Direct Jikan fallback
-        const r = await fetch('https://api.jikan.moe/v4/seasons/now?limit=12');
-        const d = await r.json();
-        seasonGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
+        seasonGrid.innerHTML = '';
       }
-    } catch(e) {
-      try {
-        const r = await fetch('https://api.jikan.moe/v4/seasons/now?limit=12');
-        const d = await r.json();
-        seasonGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
-      } catch { seasonGrid.innerHTML = ''; }
-    }
+    } catch { seasonGrid.innerHTML = ''; }
   }
 
-  // Top all time
+  // Top rated — use AniList (no rate limit)
   if (topGrid) {
     try {
-      const top = await getTopAnime(1);
-      if (top && top.data && top.data.length) {
-        topGrid.innerHTML = top.data.map(a => renderCard(a)).join('');
+      const query = `query {
+        Page(page: 1, perPage: 12) {
+          media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
+            id idMal title { romaji english }
+            coverImage { large extraLarge }
+            episodes averageScore status
+          }
+        }
+      }`;
+      const r = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const d = await r.json();
+      const items = d.data?.Page?.media || [];
+      if (items.length) {
+        topGrid.innerHTML = items.map(a => renderCard(normalizeAniList(a))).join('');
       } else {
-        const r = await fetch('https://api.jikan.moe/v4/top/anime?limit=12');
-        const d = await r.json();
-        topGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
+        topGrid.innerHTML = '';
       }
-    } catch(e) {
-      try {
-        const r = await fetch('https://api.jikan.moe/v4/top/anime?limit=12');
-        const d = await r.json();
-        topGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
-      } catch { topGrid.innerHTML = ''; }
-    }
+    } catch { topGrid.innerHTML = ''; }
   }
 }
 
