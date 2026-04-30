@@ -200,12 +200,41 @@ async function boot(){
   var el=document.getElementById('ep-list');
   if(el)el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--muted);font-size:.78rem">Loading episodes...</div>';
   try{
-    var jR=await fetch(JIKAN+'/anime/'+animeId+'/full').then(function(r){return r.json();}).catch(function(){return null;});
+    // Fetch AniList first (no rate limit), Jikan with retry
     var aR=await fetch(ANILIST,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){id title{romaji english}episodes coverImage{large}streamingEpisodes{title url site}externalLinks{site url}trailer{id}}}',variables:{id:parseInt(animeId)}})
+      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){id title{romaji english}episodes coverImage{large extraLarge}bannerImage streamingEpisodes{title url site}externalLinks{site url}trailer{id site}averageScore status}}',variables:{id:parseInt(animeId)}})
     }).then(function(r){return r.json();}).catch(function(){return null;});
-    if(jR&&jR.data)animeData=jR.data;
-    if(aR&&aR.data&&aR.data.Media){streamEps=aR.data.Media.streamingEpisodes||[];alEpisodeCount=aR.data.Media.episodes||0;alId=aR.data.Media.id||null;}
+
+    var jR=null;
+    for(var attempt=0;attempt<3;attempt++){
+      try{
+        var jRes=await fetch(JIKAN+'/anime/'+animeId+'/full');
+        if(jRes.status===429){await sleep(1500+attempt*1000);continue;}
+        jR=await jRes.json();
+        break;
+      }catch(e){await sleep(800);}
+    }
+
+    if(jR&&jR.data){
+      animeData=jR.data;
+    } else if(aR&&aR.data&&aR.data.Media){
+      // Build animeData from AniList if Jikan failed
+      var al=aR.data.Media;
+      animeData={
+        title_english:al.title&&al.title.english,
+        title:al.title&&(al.title.english||al.title.romaji),
+        images:{jpg:{large_image_url:al.coverImage&&(al.coverImage.extraLarge||al.coverImage.large)}},
+        score:al.averageScore?(al.averageScore/10).toFixed(1):null,
+        episodes:al.episodes||null,
+        status:al.status==='RELEASING'?'Currently Airing':al.status==='FINISHED'?'Finished Airing':al.status,
+        type:null,year:null,trailer:al.trailer&&al.trailer.site==='youtube'?{youtube_id:al.trailer.id}:null
+      };
+    }
+    if(aR&&aR.data&&aR.data.Media){
+      streamEps=aR.data.Media.streamingEpisodes||[];
+      alEpisodeCount=aR.data.Media.episodes||0;
+      alId=aR.data.Media.id||null;
+    }
     renderInfo();renderBtns(epNum,0);
     await loadAllEps();
     markWatched(epNum);

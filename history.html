@@ -151,6 +151,43 @@ function init() {
 
   countEl.textContent = history.length + ' anime';
 
+  // Render immediately with what we have, then enrich missing titles
+  renderHistory(history, grid);
+
+  // Fetch missing titles/images from AniList
+  const missing = history.filter(h => !h.title || h.title === 'Unknown' || !h.img);
+  if (missing.length) {
+    missing.forEach(async h => {
+      try {
+        const query = `query($id:Int){Media(idMal:$id,type:ANIME){title{english romaji}coverImage{large}}}`;
+        const r = await fetch('https://graphql.anilist.co', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, variables: { id: parseInt(h.id) } })
+        });
+        const d = await r.json();
+        const media = d.data?.Media;
+        if (media) {
+          h.title = media.title?.english || media.title?.romaji || h.title;
+          h.img = media.coverImage?.large || h.img;
+          // Update localStorage
+          const stored = JSON.parse(localStorage.getItem('watch_history') || '[]');
+          const idx = stored.findIndex(s => s.id == h.id);
+          if (idx >= 0) { stored[idx].title = h.title; stored[idx].img = h.img; localStorage.setItem('watch_history', JSON.stringify(stored)); }
+          // Update card in DOM
+          const card = document.getElementById('card-' + h.id);
+          if (card) {
+            const img = card.querySelector('.history-cover');
+            const title = card.querySelector('.history-title');
+            if (img) img.src = h.img || '';
+            if (title) { title.textContent = h.title; title.title = h.title; }
+          }
+        }
+      } catch {}
+    });
+  }
+}
+
+function renderHistory(history, grid) {
   grid.innerHTML = history.map(h => {
     const watchedEps = getWatchedEps(h.id);
     const epDots = watchedEps.length > 0
@@ -164,7 +201,6 @@ function init() {
           </div>
         </div>`
       : '';
-
     return `
     <div class="history-card" id="card-${h.id}">
       <a href="anime.html?id=${h.id}&src=mal">
