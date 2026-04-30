@@ -90,9 +90,22 @@ export async function getAnimeById(id) {
       }
     } catch {}
   }
-  // Fallback to Jikan
-  const d = await fetchCached(`${JIKAN}/anime/${id}/full`);
-  return d.data;
+  // Jikan with retry on 429
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${JIKAN}/anime/${id}/full`);
+      if (res.status === 429) {
+        await new Promise(r => setTimeout(r, 1500 + attempt * 1000));
+        continue;
+      }
+      if (res.ok) {
+        const d = await res.json();
+        if (d.data) return d.data;
+      }
+    } catch {}
+    if (attempt < 2) await new Promise(r => setTimeout(r, 800));
+  }
+  return null;
 }
 export async function getAnimeEpisodes(id, page = 1) {
   // Try local DB only on localhost

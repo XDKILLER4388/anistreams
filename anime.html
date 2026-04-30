@@ -98,8 +98,35 @@ async function init() {
       getAniListAnime(parseInt(id))
     ]);
 
-    const a = anime.value;
     const al = alData.value;
+    let a = anime.value;
+
+    // If Jikan failed, build from AniList data
+    if (!a && al) {
+      a = {
+        mal_id: al.idMal || parseInt(id),
+        title: al.title?.english || al.title?.romaji || 'Unknown',
+        title_japanese: al.title?.native,
+        synopsis: al.description?.replace(/<[^>]+>/g, '') || null,
+        images: { jpg: { large_image_url: al.coverImage?.extraLarge || al.coverImage?.large } },
+        score: al.averageScore ? (al.averageScore / 10).toFixed(1) : null,
+        episodes: al.episodes || null,
+        status: al.status === 'RELEASING' ? 'Currently Airing' : al.status === 'FINISHED' ? 'Finished Airing' : al.status,
+        type: al.format || null,
+        year: al.seasonYear || null,
+        genres: (al.genres || []).map(g => ({ name: g })),
+        aired: { string: null },
+        studios: [],
+        source: null,
+        rating: null,
+        rank: null,
+        members: al.popularity || null,
+        trailer: al.trailer?.site === 'youtube' ? { youtube_id: al.trailer.id } : null,
+        relations: [],
+      };
+    }
+
+    if (!a) { showToast('Failed to load anime.'); return; }
 
     document.title = `${a.title} — AniStream`;
 
