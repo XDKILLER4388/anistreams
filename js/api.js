@@ -38,6 +38,10 @@ function normalizeDbAnime(row) {
 
 // ── Local DB helpers ──────────────────────────────────────────────────────────
 async function dbGetAnimeList(params = {}) {
+  // Skip DB calls on Cloudflare/static hosting — only works with PHP backend
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    return null;
+  }
   const p = new URLSearchParams(params);
   try {
     const res = await fetch(`${LOCAL_API}/anime.php?${p}`);
@@ -76,43 +80,46 @@ export async function getSeasonNow(limit = 12) {
   return d.data;
 }
 export async function getAnimeById(id) {
-  // Try local DB first
-  try {
-    const res = await fetch(`${LOCAL_API}/anime.php?id=${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && !data.error) return normalizeDbAnime(data);
-    }
-  } catch {}
+  // Try local DB only on localhost
+  if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
+    try {
+      const res = await fetch(`${LOCAL_API}/anime.php?id=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && !data.error) return normalizeDbAnime(data);
+      }
+    } catch {}
+  }
   // Fallback to Jikan
   const d = await fetchCached(`${JIKAN}/anime/${id}/full`);
   return d.data;
 }
 export async function getAnimeEpisodes(id, page = 1) {
-  // Try local DB first
-  try {
-    const res = await fetch(`${LOCAL_API}/anime.php?action=aired_episodes&id=${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.source === 'db' && data.episodes?.length) {
-        // Paginate locally (25 per page)
-        const perPage = 25;
-        const start = (page - 1) * perPage;
-        const slice = data.episodes.slice(start, start + perPage);
-        return {
-          data: slice.map(ep => ({
-            mal_id: ep.episode_number,
-            title:  ep.title,
-            aired:  ep.aired,
-          })),
-          pagination: {
-            has_next_page: start + perPage < data.episodes.length,
-            last_visible_page: Math.ceil(data.episodes.length / perPage),
-          },
-        };
+  // Try local DB only on localhost
+  if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
+    try {
+      const res = await fetch(`${LOCAL_API}/anime.php?action=aired_episodes&id=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.source === 'db' && data.episodes?.length) {
+          const perPage = 25;
+          const start = (page - 1) * perPage;
+          const slice = data.episodes.slice(start, start + perPage);
+          return {
+            data: slice.map(ep => ({
+              mal_id: ep.episode_number,
+              title:  ep.title,
+              aired:  ep.aired,
+            })),
+            pagination: {
+              has_next_page: start + perPage < data.episodes.length,
+              last_visible_page: Math.ceil(data.episodes.length / perPage),
+            },
+          };
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
   return fetchCached(`${JIKAN}/anime/${id}/episodes?page=${page}`);
 }
 export async function searchAnime(query, filters = {}) {
