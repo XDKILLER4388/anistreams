@@ -83,16 +83,41 @@ async function initHome() {
   if (seasonGrid) {
     try {
       const season = await getSeasonNow(12);
-      seasonGrid.innerHTML = season.map(a => renderCard(a)).join('');
-    } catch { seasonGrid.innerHTML = ''; }
+      if (season && season.length) {
+        seasonGrid.innerHTML = season.map(a => renderCard(a)).join('');
+      } else {
+        // Direct Jikan fallback
+        const r = await fetch('https://api.jikan.moe/v4/seasons/now?limit=12');
+        const d = await r.json();
+        seasonGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
+      }
+    } catch(e) {
+      try {
+        const r = await fetch('https://api.jikan.moe/v4/seasons/now?limit=12');
+        const d = await r.json();
+        seasonGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
+      } catch { seasonGrid.innerHTML = ''; }
+    }
   }
 
   // Top all time
   if (topGrid) {
     try {
       const top = await getTopAnime(1);
-      topGrid.innerHTML = top.data.map(a => renderCard(a)).join('');
-    } catch { topGrid.innerHTML = ''; }
+      if (top && top.data && top.data.length) {
+        topGrid.innerHTML = top.data.map(a => renderCard(a)).join('');
+      } else {
+        const r = await fetch('https://api.jikan.moe/v4/top/anime?limit=12');
+        const d = await r.json();
+        topGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
+      }
+    } catch(e) {
+      try {
+        const r = await fetch('https://api.jikan.moe/v4/top/anime?limit=12');
+        const d = await r.json();
+        topGrid.innerHTML = (d.data || []).map(a => renderCard(a)).join('');
+      } catch { topGrid.innerHTML = ''; }
+    }
   }
 }
 
