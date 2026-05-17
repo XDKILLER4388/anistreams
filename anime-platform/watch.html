@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch - AniStream</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+<style>
+.video-container{background:#000;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:16/9;position:relative}
+#video-player,#video-player>*{width:100%;height:100%}
+#video-player iframe{border:none;display:block;width:100%;height:100%}
+.server-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.7rem 0;border-bottom:1px solid var(--border);margin-bottom:.8rem}
+.server-label{font-size:.7rem;letter-spacing:2px;color:var(--muted)}
+#source-badge{display:none;font-size:.72rem;letter-spacing:1px;margin-top:.3rem}
+.ep-item{cursor:pointer}
+.ep-item.watched{opacity:.6}
+.ep-item.watched .ep-num{color:#4ade80}
+.ctrl-btn{background:none;border:1px solid #333;color:var(--muted);border-radius:20px;padding:.3rem .85rem;font-size:.7rem;cursor:pointer;letter-spacing:.5px;transition:all .2s;white-space:nowrap}
+.ctrl-btn:hover{border-color:#555;color:var(--text)}
+.ctrl-btn.ctrl-active{border-color:#e85d04;color:#e85d04}
+body.focus-mode nav,body.focus-mode footer,body.focus-mode .watch-layout>div:last-child,body.focus-mode #current-ep-label,body.focus-mode .watch-meta{display:none!important}
+body.focus-mode .watch-layout{grid-template-columns:1fr}
+/* Download modal */
+#dl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center}
+#dl-modal.open{display:flex}
+.dl-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:2rem;width:100%;max-width:440px;position:relative;max-height:90vh;overflow-y:auto}
+.dl-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text);transition:border-color .2s;margin-bottom:.5rem;cursor:pointer}
+.dl-row:hover{border-color:#555}
+</style>
+</head>
+<body>
+<nav>
+<a href="index.html" class="nav-logo">ANISTREAM</a>
+<div class="nav-links"><a href="index.html">Home</a><a href="search.html">Browse</a><a href="history.html">History</a></div>
+<div style="display:flex;align-items:center;gap:.5rem">
+<form class="nav-search" action="search.html" method="get">
+<input type="text" name="q" placeholder="Search anime..." autocomplete="off">
+<button type="submit">&#x2315;</button>
+</form>
+<div id="nav-user" style="display:flex;gap:.4rem;align-items:center"></div>
+<button class="nav-hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+</div>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="index.html">Home</a>
+  <a href="search.html">Browse</a>
+  <a href="history.html">History</a>
+</div>
+
+<div class="watch-layout">
+<div>
+<div class="server-bar">
+<span class="server-label">SERVER</span>
+<div id="server-selector" style="display:flex;gap:.4rem;flex-wrap:wrap"></div>
+</div>
+<div class="video-container">
+<div id="video-player">
+<div class="video-placeholder">
+<div class="big-play">&#9654;</div>
+<p style="font-family:'Orbitron',sans-serif;letter-spacing:2px;font-size:.85rem">LOADING...</p>
+</div>
+</div>
+</div>
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-top:.8rem;flex-wrap:wrap;gap:.5rem">
+<div>
+<h1 class="watch-title" id="watch-title">Loading...</h1>
+<p class="watch-meta" id="watch-meta"></p>
+<p style="color:var(--muted);font-size:.85rem;margin-top:.2rem" id="current-ep-label"></p>
+<span id="source-badge"></span>
+</div>
+<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+<button class="btn btn-ghost" onclick="prevEp()" style="font-size:.75rem">&#8592; PREV</button>
+<button class="btn btn-ghost" onclick="nextEp()" style="font-size:.75rem">NEXT &#8594;</button>
+<a id="anime-link" href="#" class="btn btn-ghost" style="font-size:.75rem">INFO</a>
+<button onclick="openDlModal()" class="btn btn-ghost" style="font-size:.75rem">&#11015; DOWNLOAD</button>
+</div>
+</div>
+<!-- Controls bar -->
+<div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;padding:.6rem 0;border-top:1px solid var(--border);margin-top:.6rem">
+<button id="btn-focus" onclick="toggleFocus()" class="ctrl-btn" title="Hide everything except the player">&#9790; Focus</button>
+<button id="btn-autonext" onclick="toggleAutoNext()" class="ctrl-btn ctrl-active" title="Auto-play next episode when current ends">&#9654;&#9654; AutoNext</button>
+<button id="btn-autoplay" onclick="toggleAutoPlay()" class="ctrl-btn" title="Auto-play on load">&#9654; AutoPlay</button>
+<button id="btn-autoskip" onclick="toggleAutoSkip()" class="ctrl-btn" title="Auto-skip intro (when supported)">&#10006; AutoSkip</button>
+<button class="ctrl-btn" onclick="prevEp()">&#8676; Prev</button>
+<button class="ctrl-btn" onclick="nextEp()">Next &#8677;</button>
+</div>
+<div style="display:flex;gap:1rem;margin-top:1rem;align-items:center;padding-top:.8rem;border-top:1px solid var(--border)">
+<img id="watch-poster" src="" alt="" style="width:56px;height:80px;object-fit:cover;border-radius:5px;border:1px solid var(--border);flex-shrink:0">
+<p style="font-size:.78rem;color:var(--muted);line-height:1.7">If a server shows an error, try another server.<br>Click &#11015; DOWNLOAD to save this episode as a video file.</p>
+</div>
+</div>
+<div>
+<p class="sidebar-title">EPISODE LIST</p>
+<div id="ep-status" style="font-size:.7rem;color:var(--muted);margin-bottom:.5rem"></div>
+<div class="ep-list" id="ep-list">
+<div class="skeleton" style="height:52px;border-radius:6px"></div>
+<div class="skeleton" style="height:52px;border-radius:6px;margin-top:6px"></div>
+<div class="skeleton" style="height:52px;border-radius:6px;margin-top:6px"></div>
+</div>
+</div>
+</div>
+
+<!-- Download modal -->
+<div id="dl-modal">
+<div class="dl-box">
+<button onclick="closeDlModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;line-height:1">&#10005;</button>
+<p style="font-family:'Orbitron',sans-serif;font-size:.8rem;letter-spacing:2px;margin-bottom:1.25rem">&#11015; DOWNLOAD EPISODE</p>
+<div id="dl-body">
+<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.85rem">
+<div style="font-size:1.5rem;margin-bottom:.75rem">&#9203;</div>
+Fetching video sources...
+</div>
+</div>
+</div>
+</div>
+
+<footer>
+<div class="footer-logo">ANISTREAM</div>
+<p>Metadata by <a href="https://jikan.moe" target="_blank" rel="noopener" style="color:var(--text)">Jikan</a> and <a href="https://anilist.co" target="_blank" rel="noopener" style="color:var(--text)">AniList</a></p>
+</footer>
+<div id="toast" class="toast"></div>
+
+<script>
+var JIKAN='https://api.jikan.moe/v4';
+var ANILIST='https://graphql.anilist.co';
+var p=new URLSearchParams(location.search);
+var animeId=p.get('id');
+var epNum=parseInt(p.get('ep')||'1');
+var animeData=null,streamEps=[],airedEps=[],currentEp=epNum,alEpisodeCount=0,alId=null;
+
+function providers(id,ep,aid){
+  var base=[];
+  // MAL-based
+  base.push({n:'SUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/sub'});
+  base.push({n:'DUB',   u:'https://megaplay.buzz/stream/mal/'+id+'/'+ep+'/dub'});
+  // AniList-based fallbacks (different mapping, often works when MAL doesn't)
+  if(aid){
+    base.push({n:'SUB 2', u:'https://megaplay.buzz/stream/ani/'+aid+'/'+ep+'/sub'});
+    base.push({n:'DUB 2', u:'https://megaplay.buzz/stream/ani/'+aid+'/'+ep+'/dub'});
+  }
+  base.push({n:'SUB 3', u:'https://megaplay.icu/stream/mal/'+id+'/'+ep+'/sub'});
+  base.push({n:'DUB 3', u:'https://megaplay.icu/stream/mal/'+id+'/'+ep+'/dub'});
+  return base;
+}
+
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+
+async function jikanPage(pg,tries){
+  tries=tries||3;
+  for(var i=0;i<tries;i++){
+    try{
+      var r=await fetch(JIKAN+'/anime/'+animeId+'/episodes?page='+pg);
+      if(r.status===429){await sleep(1000+i*500);continue;}
+      return await r.json();
+    }catch(e){if(i===tries-1)throw e;await sleep(600);}
+  }
+  return null;
+}
+
+async function loadAllEps(){
+  var all=[];
+  try{
+    var p1=await jikanPage(1);
+    all=p1&&p1.data?p1.data:[];
+    var last=(p1&&p1.pagination&&p1.pagination.last_visible_page)||1;
+    for(var pg=2;pg<=last;pg++){
+      await sleep(350);
+      var d=await jikanPage(pg);
+      if(d&&d.data)all=all.concat(d.data);
+    }
+  }catch(e){console.warn(e);}
+
+  var malTotal=(animeData&&animeData.episodes)||0;
+  var alTotal=alEpisodeCount||0;
+  var epMap={};
+  all.forEach(function(e){epMap[e.mal_id]=e.title||null;});
+
+  var cutoff=new Date();cutoff.setDate(cutoff.getDate()+7);
+  var isAiring=animeData&&animeData.status==='Currently Airing';
+
+  var jikanAired=all.filter(function(e){return !e.aired||new Date(e.aired)<=cutoff;}).length;
+  // Best count = max of all sources
+  var epCount=Math.max(jikanAired, malTotal, alTotal);
+
+  if(epCount>0){
+    airedEps=[];
+    for(var i=1;i<=epCount;i++){
+      airedEps.push({n:i,t:epMap[i]||('Episode '+i),d:null});
+    }
+  } else if(all.length){
+    airedEps=all.map(function(e){return{n:e.mal_id,t:e.title||('Episode '+e.mal_id),d:e.aired||null};});
+  }
+}
+
+async function boot(){
+  if(!animeId){location.href='index.html';return;}
+  renderEmbed(epNum,0);
+  window.open=function(){return null;};
+  var el=document.getElementById('ep-list');
+  if(el)el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--muted);font-size:.78rem">Loading episodes...</div>';
+  try{
+    // Fetch AniList first (no rate limit), Jikan with retry
+    var aR=await fetch(ANILIST,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({query:'query($id:Int){Media(idMal:$id,type:ANIME){id title{romaji english}episodes coverImage{large extraLarge}bannerImage streamingEpisodes{title url site}externalLinks{site url}trailer{id site}averageScore status}}',variables:{id:parseInt(animeId)}})
+    }).then(function(r){return r.json();}).catch(function(){return null;});
+
+    var jR=null;
+    for(var attempt=0;attempt<3;attempt++){
+      try{
+        var jRes=await fetch(JIKAN+'/anime/'+animeId+'/full');
+        if(jRes.status===429){await sleep(1500+attempt*1000);continue;}
+        jR=await jRes.json();
+        break;
+      }catch(e){await sleep(800);}
+    }
+
+    if(jR&&jR.data){
+      animeData=jR.data;
+    } else if(aR&&aR.data&&aR.data.Media){
+      // Build animeData from AniList if Jikan failed
+      var al=aR.data.Media;
+      animeData={
+        title_english:al.title&&al.title.english,
+        title:al.title&&(al.title.english||al.title.romaji),
+        images:{jpg:{large_image_url:al.coverImage&&(al.coverImage.extraLarge||al.coverImage.large)}},
+        score:al.averageScore?(al.averageScore/10).toFixed(1):null,
+        episodes:al.episodes||null,
+        status:al.status==='RELEASING'?'Currently Airing':al.status==='FINISHED'?'Finished Airing':al.status,
+        type:null,year:null,trailer:al.trailer&&al.trailer.site==='youtube'?{youtube_id:al.trailer.id}:null
+      };
+    }
+    if(aR&&aR.data&&aR.data.Media){
+      streamEps=aR.data.Media.streamingEpisodes||[];
+      alEpisodeCount=aR.data.Media.episodes||0;
+      alId=aR.data.Media.id||null;
+    }
+    renderInfo();renderBtns(epNum,0);
+    await loadAllEps();
+    markWatched(epNum);
+    renderList();
+    var tgt=airedEps.find(function(e){return e.n===epNum;})?epNum:(airedEps[0]?airedEps[0].n:1);
+    if(tgt!==epNum)loadEp(tgt,false);
+    else{document.getElementById('current-ep-label').textContent='Episode '+currentEp;renderEmbed(currentEp,0);renderBtns(currentEp,0);}
+  }catch(e){console.error(e);}
+}
+
+function mkIframe(src){
+  return '<iframe src="'+src+'" allowfullscreen allow="autoplay;fullscreen;picture-in-picture;encrypted-media" sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen" style="width:100%;height:100%;border:none;display:block" loading="eager"></iframe>';
+}
+function renderEmbed(ep,idx){var w=document.getElementById('video-player');if(!w)return;var ps=providers(animeId,ep,alId);w.innerHTML=mkIframe(ps[idx].u);badge('&#9654; '+ps[idx].n,'#4ade80');}
+function renderBtns(ep,ai){
+  var ps=providers(animeId,ep,alId);var h='';
+  for(var i=0;i<ps.length;i++)h+='<button onclick="switchSrv('+i+')" class="btn '+(i===ai?'btn-primary':'btn-ghost')+'" style="font-size:.65rem;padding:.4rem .9rem;letter-spacing:1px">'+ps[i].n+'</button>';
+  document.getElementById('server-selector').innerHTML=h;
+}
+function renderInfo(){
+  if(!animeData)return;
+  var t=animeData.title_english||animeData.title||'';
+  document.getElementById('watch-title').textContent=t;
+  var pts=[animeData.type,animeData.year,animeData.status];if(animeData.score)pts.push('&#9733; '+animeData.score);
+  document.getElementById('watch-meta').innerHTML=pts.filter(Boolean).join(' &middot; ');
+  var po=document.getElementById('watch-poster');if(po&&animeData.images&&animeData.images.jpg){po.src=animeData.images.jpg.large_image_url||'';po.alt=t;}
+  document.title='Watch '+t+' - AniStream';
+  var l=document.getElementById('anime-link');if(l)l.href='anime.html?id='+animeId+'&src=mal';
+}
+function renderList(){
+  var el=document.getElementById('ep-list');if(!el)return;
+  var st=document.getElementById('ep-status');
+  if(!airedEps.length){el.innerHTML='<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:.82rem">No episodes available yet.</div>';return;}
+  if(st){var tot=animeData&&animeData.episodes?animeData.episodes:'?';var air=animeData&&animeData.status==='Currently Airing';st.innerHTML='<span style="color:#4ade80">'+airedEps.length+' aired</span>'+(air?' <span style="color:#555">/ '+tot+' total</span>':'');}
+  var h='';for(var i=0;i<airedEps.length;i++)h+=epItem(airedEps[i]);
+  el.innerHTML=h;
+  setTimeout(function(){var e=document.getElementById('ep-item-'+currentEp);if(e)e.scrollIntoView({block:'center',behavior:'smooth'});},80);
+}
+// ── Watched episodes (per anime, stored in localStorage) ─────────────────────
+function watchedKey(){return 'watched_'+animeId;}
+function getWatched(){try{return JSON.parse(localStorage.getItem(watchedKey())||'[]');}catch(e){return[];}}
+function markWatched(ep){try{var w=getWatched();if(w.indexOf(ep)<0){w.push(ep);localStorage.setItem(watchedKey(),JSON.stringify(w));}}catch(e){}}
+function isWatched(ep){return getWatched().indexOf(ep)>=0;}
+
+function epItem(ep){
+  var act=ep.n===currentEp;
+  var watched=isWatched(ep.n);
+  var ds=ep.d?new Date(ep.d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+  return '<div class="ep-item '+(act?'active':'')+(watched&&!act?' watched':'')+'" id="ep-item-'+ep.n+'" onclick="loadEp('+ep.n+')" role="button" tabindex="0">'
+    +'<span class="ep-num">'+String(ep.n).padStart(2,'0')+(watched&&!act?' <span style="color:#4ade80;font-size:.55rem">✓</span>':'')+'</span>'
+    +'<div style="flex:1;min-width:0"><div class="ep-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'+(watched&&!act?'color:#888':'')+'">'+ep.t+'</div>'
+    +'<div style="font-size:.58rem;color:#555;margin-top:1px">'+ds+'</div>'
+    +'</div></div>';
+}
+function loadEp(n,push){
+  if(push===undefined)push=true;
+  var f=null;for(var i=0;i<airedEps.length;i++){if(airedEps[i].n===n){f=airedEps[i];break;}}if(!f)return;
+  currentEp=n;if(push)history.pushState({},'','?id='+animeId+'&ep='+n);
+  document.querySelectorAll('.ep-item').forEach(function(e){e.classList.remove('active');});
+  var e=document.getElementById('ep-item-'+n);if(e){e.classList.add('active');e.scrollIntoView({block:'nearest',behavior:'smooth'});}
+  document.getElementById('current-ep-label').textContent='Episode '+n;
+  renderEmbed(n,0);renderBtns(n,0);
+  markWatched(n);
+  saveH(n);
+  // Refresh list to update watched indicators without full re-render
+  document.querySelectorAll('.ep-item').forEach(function(el){
+    var num=parseInt(el.id.replace('ep-item-',''));
+    if(isWatched(num)&&num!==currentEp){el.classList.add('watched');}
+  });
+}
+function switchSrv(i){renderEmbed(currentEp,i);renderBtns(currentEp,i);}
+function prevEp(){var idx=-1;for(var i=0;i<airedEps.length;i++){if(airedEps[i].n===currentEp){idx=i;break;}}if(idx>0)loadEp(airedEps[idx-1].n);}
+function nextEp(){var idx=-1;for(var i=0;i<airedEps.length;i++){if(airedEps[i].n===currentEp){idx=i;break;}}if(idx>=0&&idx<airedEps.length-1)loadEp(airedEps[idx+1].n);}
+function badge(txt,col){var b=document.getElementById('source-badge');if(!b)return;b.innerHTML=txt;b.style.color=col;b.style.display=txt?'inline-block':'none';}
+function saveH(ep){try{var h=JSON.parse(localStorage.getItem('watch_history')||'[]');var idx=-1;for(var i=0;i<h.length;i++){if(h[i].id==animeId){idx=i;break;}}var e={id:animeId,ep:ep,title:animeData&&(animeData.title_english||animeData.title),img:animeData&&animeData.images&&animeData.images.jpg&&animeData.images.jpg.large_image_url,ts:Date.now()};if(idx>=0)h[idx]=e;else h.unshift(e);localStorage.setItem('watch_history',JSON.stringify(h.slice(0,50)));}catch(err){}}
+
+// ── Download modal ────────────────────────────────────────────────────────────
+function openDlModal(){
+  var modal=document.getElementById('dl-modal');
+  modal.classList.add('open');
+  fetchSources();
+}
+function closeDlModal(){
+  document.getElementById('dl-modal').classList.remove('open');
+}
+// Close on backdrop click
+document.getElementById('dl-modal').addEventListener('click',function(e){if(e.target===this)closeDlModal();});
+
+async function fetchSources(){
+  var body=document.getElementById('dl-body');
+  var title=(animeData&&(animeData.title_english||animeData.title))||'Anime';
+  var safe=title.replace(/[\/\\?%*:|"<>]/g,'-');
+  var streamUrl='https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/sub';
+  var cmd='yt-dlp "'+streamUrl+'" -o "'+safe+' - Episode '+currentEp+'.mp4"';
+
+  body.innerHTML=
+    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:1rem"><strong style="color:var(--text)">'+title+'</strong> &mdash; Episode '+currentEp+'</p>'
+
+    // yt-dlp command box
+    +'<p style="font-size:.7rem;letter-spacing:1px;color:var(--muted);margin-bottom:.4rem">YT-DLP COMMAND</p>'
+    +'<div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:.75rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem">'
+    +'<code id="ytdlp-cmd" style="font-size:.7rem;color:#4ade80;flex:1;word-break:break-all;line-height:1.6">'+cmd+'</code>'
+    +'<button onclick="var c=document.getElementById(\'ytdlp-cmd\');navigator.clipboard.writeText(c.textContent);this.textContent=\'Copied!\';setTimeout(()=>this.textContent=\'Copy\',2000)" '
+    +'style="background:#222;border:1px solid #444;color:#fff;border-radius:4px;padding:.3rem .7rem;font-size:.7rem;cursor:pointer;white-space:nowrap">Copy</button>'
+    +'</div>'
+    +'<p style="font-size:.68rem;color:#555;margin-bottom:1.25rem;line-height:1.6">Paste this in your terminal to download. Requires <a href="https://github.com/yt-dlp/yt-dlp/releases/latest" target="_blank" style="color:#4ade80">yt-dlp</a>.</p>'
+
+    // Stream links
+    +'<p style="font-size:.7rem;letter-spacing:1px;color:var(--muted);margin-bottom:.4rem">STREAM IN BROWSER</p>'
+    +'<a href="https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/sub" target="_blank" rel="noopener" class="dl-row">'
+    +'<span style="font-size:.88rem;font-weight:600">SUB</span><span style="font-size:.7rem;color:var(--muted)">Stream</span><span style="font-size:.75rem;color:#4ade80">&#9654; Open</span></a>'
+    +'<a href="https://megaplay.buzz/stream/mal/'+animeId+'/'+currentEp+'/dub" target="_blank" rel="noopener" class="dl-row" style="margin-top:.4rem">'
+    +'<span style="font-size:.88rem;font-weight:600">DUB</span><span style="font-size:.7rem;color:var(--muted)">Stream</span><span style="font-size:.75rem;color:#4ade80">&#9654; Open</span></a>';
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+var autoNext = JSON.parse(localStorage.getItem('autoNext') ?? 'true');
+var autoPlay = JSON.parse(localStorage.getItem('autoPlay') ?? 'false');
+var autoSkip = JSON.parse(localStorage.getItem('autoSkip') ?? 'false');
+var focusMode = false;
+
+function updateCtrlBtns(){
+  document.getElementById('btn-autonext').className='ctrl-btn'+(autoNext?' ctrl-active':'');
+  document.getElementById('btn-autoplay').className='ctrl-btn'+(autoPlay?' ctrl-active':'');
+  document.getElementById('btn-autoskip').className='ctrl-btn'+(autoSkip?' ctrl-active':'');
+  document.getElementById('btn-focus').className='ctrl-btn'+(focusMode?' ctrl-active':'');
+}
+function toggleAutoNext(){autoNext=!autoNext;localStorage.setItem('autoNext',autoNext);updateCtrlBtns();}
+function toggleAutoPlay(){autoPlay=!autoPlay;localStorage.setItem('autoPlay',autoPlay);updateCtrlBtns();}
+function toggleAutoSkip(){autoSkip=!autoSkip;localStorage.setItem('autoSkip',autoSkip);updateCtrlBtns();}
+function toggleFocus(){focusMode=!focusMode;document.body.classList.toggle('focus-mode',focusMode);updateCtrlBtns();}
+
+// Listen for episode complete from megaplay iframe
+window.addEventListener('message',function(e){
+  var data=e.data;
+  if(typeof data==='string'){try{data=JSON.parse(data);}catch(ex){return;}}
+  if(!data)return;
+  // AutoSkip intro
+  if(autoSkip&&data.event==='intro'&&data.end){
+    var iframe=document.querySelector('#video-player iframe');
+    if(iframe)iframe.contentWindow.postMessage(JSON.stringify({channel:'megacloud',action:'seek',time:data.end}),iframe.src.split('/').slice(0,3).join('/'));
+  }
+  // AutoNext on complete
+  if(autoNext&&(data.event==='complete'||data.type==='complete')){
+    setTimeout(function(){nextEp();},1200);
+  }
+});
+
+boot();
+// Sync button states after page loads
+document.addEventListener('DOMContentLoaded',function(){updateCtrlBtns();});
+</script>
+<script type="module">
+import { getUser, renderNavUser, injectAuthModal } from './js/auth.js';
+injectAuthModal();
+getUser().then(function(u){renderNavUser(u);});
+</script>
+<script>
+document.getElementById('hamburger').addEventListener('click', function() {
+  document.getElementById('mobile-menu').classList.toggle('open');
+});
+</script>
+</body>
+</html>
