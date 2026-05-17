@@ -209,7 +209,7 @@ async function doSearch() {
   renderSkeletons(24, grid);
   if (resultsEl) resultsEl.textContent = 'Searching...';
 
-  // 1. Try Local DB first
+  // 1. Try Local DB first (best for cached/custom content)
   try {
     const dbParams = {
       q: state.query,
@@ -229,74 +229,113 @@ async function doSearch() {
       return;
     }
   } catch (e) {
-    console.warn('Local DB search unavailable, using remote APIs');
+    console.warn('Local DB search unavailable');
   }
 
-  // 2. Fallback to remote APIs
-  const hasFilters = Object.keys(state.filters).length > 0;
-  if (!state.query && !hasFilters) {
+  // 2. Try AniList (Fast, robust search, supports Romaji/English/Native)
+  try {
+    const hasFilters = Object.keys(state.filters).length > 0;
+    const sortMap = { 
+      score: 'SCORE_DESC', 
+      popularity: 'POPULARITY_DESC', 
+      title: 'TITLE_ROMAJI_ASC', 
+      start_date: 'START_DATE_DESC' 
+    };
+    
+    const alSort = sortMap[state.sort] || 'SCORE_DESC';
+    const variables = { 
+      page: state.page, 
+      perPage: 24,
+      search: state.query || undefined,
+      type: 'ANIME',
+      sort: [alSort]
+    };
+
+    // Build filter-specific query parts if needed
+    let filterString = '';
+    if (state.filters.status) {
+      const statusMap = { airing: 'RELEASING', complete: 'FINISHED', upcoming: 'NOT_YET_RELEASED' };
+      if (statusMap[state.filters.status]) {
+        filterString += `, status: ${statusMap[state.filters.status]}`;
+      }
+    }
+    if (state.filters.year) {
+      filterString += `, seasonYear: ${state.filters.year}`;
+    }
+
+    const query = `
+      query ($page: Int, $perPage: Int, $search: String) {
+        Page(page: $page, perPage: $perPage) {
+          pageInfo { total lastPage }
+          media(search: $search, type: ANIME, sort: [${alSort}] ${filterString}, isAdult: false) {
+            id idMal title { romaji english native }
+            coverImage { extraLarge large }
+            episodes averageScore status format seasonYear
+          }
+        }
+      }`;
+
+    const r = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables })
+    });
+
+    const d = await r.json();
+    const items = d.data?.Page?.media || [];
+
+    if (items.length) {
+      totalPages = Math.min(d.data?.Page?.pageInfo?.lastPage || 1, 50);
+      grid.innerHTML = items.map(a => renderCard({
+        mal_id: a.idMal,
+        title: a.title?.english || a.title?.romaji || a.title?.native,
+        images: { jpg: { large_image_url: a.coverImage?.extraLarge || a.coverImage?.large } },
+        score: a.averageScore ? (a.averageScore / 10).toFixed(1) : null,
+        episodes: a.episodes,
+        status: a.status,
+        type: a.format,
+        year: a.seasonYear
+      })).join('');
+      
+      const total = d.data?.Page?.pageInfo?.total || items.length;
+      if (resultsEl) resultsEl.textContent = `${total.toLocaleString()} results (Global)`;
+      renderPagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+  } catch (e) {
+    console.error('AniList search failed:', e);
+  }
+
+  // 3. Last Resort: Jikan (MAL) with retry logic
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const sortMap = { score: 'SCORE_DESC', popularity: 'POPULARITY_DESC', title: 'TITLE_ROMAJI_ASC', start_date: 'START_DATE_DESC' };
-      const alSort = sortMap[state.sort] || 'SCORE_DESC';
-      const query = `query($page:Int){Page(page:$page,perPage:24){pageInfo{total lastPage}media(type:ANIME,sort:${alSort},isAdult:false){id idMal title{romaji english}coverImage{large extraLarge}episodes averageScore status}}}`;
-      const r = await fetch('https://graphql.anilist.co', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { page: state.page } })
-      });
-      const d = await r.json();
-      const items = d.data?.Page?.media || [];
-      if (items.length) {
-        totalPages = Math.min(d.data?.Page?.pageInfo?.lastPage || 1, 20);
-        grid.innerHTML = items.map(a => renderCard({
-          mal_id: a.idMal, title: a.title?.english || a.title?.romaji,
-          images: { jpg: { large_image_url: a.coverImage?.extraLarge || a.coverImage?.large } },
-          score: a.averageScore ? (a.averageScore/10).toFixed(1) : null,
-          episodes: a.episodes, status: a.status,
-        })).join('');
-        if (resultsEl) resultsEl.textContent = `${(d.data?.Page?.pageInfo?.total || items.length).toLocaleString()} results`;
+      const res = await fetch(buildUrl());
+      if (res.status === 429) {
+        await new Promise(r => setTimeout(r, 1500));
+        continue;
+      }
+      const data = await res.json();
+
+      if (data.data?.length) {
+        totalPages = Math.min(data.pagination?.last_visible_page || 1, 20);
+        grid.innerHTML = data.data.map(a => renderCard(a)).join('');
+        const total = data.pagination?.items?.total || data.data.length;
+        if (resultsEl) resultsEl.textContent = `${total.toLocaleString()} results (MAL)`;
         renderPagination();
         return;
       }
     } catch {}
   }
 
-  // Jikan search with retry on 429
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(buildUrl());
-      if (res.status === 429) {
-        await new Promise(r => setTimeout(r, 1500 + attempt * 1000));
-        continue;
-      }
-      const data = await res.json();
-
-      if (!data.data?.length) {
-        grid.innerHTML = `<div class="browse-empty">
-          <div class="empty-icon">🔍</div>
-          <p>No results found${state.query ? ` for "<strong>${state.query}</strong>"` : ''}</p>
-          <p style="font-size:.8rem;margin-top:.5rem">Try different filters or a broader search</p>
-        </div>`;
-        if (resultsEl) resultsEl.textContent = '0 results';
-        if (pagEl) pagEl.innerHTML = '';
-        return;
-      }
-
-      totalPages = Math.min(data.pagination?.last_visible_page || 1, 20);
-      state.page = data.pagination?.current_page || state.page;
-      grid.innerHTML = data.data.map(a => renderCard(a)).join('');
-      const total = data.pagination?.items?.total;
-      if (resultsEl) resultsEl.textContent = total ? `${total.toLocaleString()} results` : `${data.data.length} results`;
-      renderPagination();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    } catch(e) {
-      if (attempt === 2) {
-        grid.innerHTML = `<div class="browse-empty"><div class="empty-icon">⚠️</div><p>Search failed: ${e.message}</p></div>`;
-        showToast('Search failed. Try again.');
-      }
-      await new Promise(r => setTimeout(r, 800));
-    }
-  }
+  // If all failed or no results found anywhere
+  grid.innerHTML = `<div class="browse-empty">
+    <div class="empty-icon">🔍</div>
+    <p>No results found${state.query ? ` for "<strong>${state.query}</strong>"` : ''}</p>
+    <p style="font-size:.8rem;margin-top:.5rem">Try different filters or a broader search</p>
+  </div>`;
+  if (resultsEl) resultsEl.textContent = '0 results';
+  if (pagEl) pagEl.innerHTML = '';
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
