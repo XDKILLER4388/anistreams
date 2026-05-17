@@ -21,6 +21,40 @@ const resultsEl = document.getElementById('results-info');
 const pagEl     = document.getElementById('pagination');
 const chipsEl   = document.getElementById('active-filters');
 
+// ── Normalize DB row → same shape as Jikan response ──────────────────────────
+function normalizeDbAnime(row) {
+  return {
+    mal_id:   row.mal_id,
+    title:    row.title,
+    title_english: row.title,
+    title_japanese: row.title_jp,
+    synopsis: row.synopsis,
+    images:   { jpg: { large_image_url: row.cover_image } },
+    score:    row.score,
+    episodes: row.episodes,
+    status:   row.status,
+    type:     row.type,
+    year:     row.year,
+    genres:   (row.genre || '').split(',').filter(Boolean).map(g => ({ name: g.trim() })),
+  };
+}
+
+// ── Local DB helpers ──────────────────────────────────────────────────────────
+async function dbGetAnimeList(params = {}) {
+  // Skip DB calls on Cloudflare/static hosting — only works with PHP backend
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    return null;
+  }
+  const p = new URLSearchParams(params);
+  try {
+    const res = await fetch(`backend/api/anime.php?${p}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.error) return null;
+    return data;
+  } catch { return null; }
+}
+
 // ── Build A–Z grid ────────────────────────────────────────────────────────────
 function buildAlpha() {
   const container = document.getElementById('alpha-grid');
@@ -150,7 +184,13 @@ function buildUrl() {
   p.set('sfw', 'true');
   p.set('page', state.page);
 
-  if (state.query)  p.set('q', state.query);
+  if (state.query) {
+    // Check if query is Romaji (alphanumeric)
+    const isRomaji = /^[a-z0-9\s\-_',.?!&()]+$/i.test(state.query);
+    p.set('q', state.query);
+    // For Romaji queries, sometimes Jikan works better without letter filter
+  }
+
   if (f.type)       p.set('type', f.type);
   if (f.status)     p.set('status', f.status);
   if (f.genre)      p.set('genres', f.genre);
@@ -171,10 +211,35 @@ function buildUrl() {
 async function doSearch() {
   if (!grid) return;
   renderSkeletons(24, grid);
-  if (resultsEl) resultsEl.textContent = 'Loading…';
+  if (resultsEl) resultsEl.textContent = 'Searching...';
 
-  // No query + no filters = use AniList (avoids Jikan rate limit on initial load)
   const hasFilters = Object.keys(state.filters).length > 0;
+
+  // 1. Try Local DB first if on localhost
+  if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
+    try {
+      const dbParams = {
+        q: state.query,
+        page: state.page,
+        limit: 24,
+        status: state.filters.status,
+        year: state.filters.year,
+        genre: state.filters.genre_label // Local DB expects genre name
+      };
+      const dbRes = await dbGetAnimeList(dbParams);
+      if (dbRes?.data?.length) {
+        totalPages = Math.ceil((dbRes.pagination?.total || dbRes.data.length) / 24);
+        grid.innerHTML = dbRes.data.map(a => renderCard(normalizeDbAnime(a))).join('');
+        if (resultsEl) resultsEl.textContent = `${(dbRes.pagination?.total || dbRes.data.length).toLocaleString()} results (Local)`;
+        renderPagination();
+        return;
+      }
+    } catch (e) {
+      console.warn('Local DB search failed, falling back to Jikan:', e);
+    }
+  }
+
+  // 2. Fallback to AniList for initial load or if query matches
   if (!state.query && !hasFilters) {
     try {
       const sortMap = { score: 'SCORE_DESC', popularity: 'POPULARITY_DESC', title: 'TITLE_ROMAJI_ASC', start_date: 'START_DATE_DESC' };

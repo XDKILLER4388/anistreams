@@ -90,8 +90,11 @@ if ($method === 'GET') {
             $params[] = $_GET['status'];
         }
         if (!empty($_GET['q'])) {
-            $where[] = 'title LIKE ?';
-            $params[] = '%' . $_GET['q'] . '%';
+            $q = $_GET['q'];
+            $where[] = '(title LIKE ? OR title_jp LIKE ? OR synopsis LIKE ?)';
+            $params[] = '%' . $q . '%';
+            $params[] = '%' . $q . '%';
+            $params[] = '%' . $q . '%';
         }
 
         $sql = 'SELECT * FROM anime WHERE ' . implode(' AND ', $where)
