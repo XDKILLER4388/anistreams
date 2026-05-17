@@ -216,6 +216,8 @@ async function doSearch() {
       page: state.page,
       limit: 24,
       status: state.filters.status,
+      type: state.filters.type,
+      min_score: state.filters.min_score,
       year: state.filters.year,
       letter: state.filters.letter,
       genre: state.filters.genre_label
@@ -247,11 +249,9 @@ async function doSearch() {
       page: state.page, 
       perPage: 24,
       search: state.query || undefined,
-      type: 'ANIME',
-      sort: [alSort]
     };
 
-    // Build filter-specific query parts if needed
+    // Build filter-specific query parts
     let filterString = '';
     if (state.filters.status) {
       const statusMap = { airing: 'RELEASING', complete: 'FINISHED', upcoming: 'NOT_YET_RELEASED' };
@@ -261,6 +261,15 @@ async function doSearch() {
     }
     if (state.filters.year) {
       filterString += `, seasonYear: ${state.filters.year}`;
+    }
+    if (state.filters.type) {
+      filterString += `, format: ${state.filters.type.toUpperCase()}`;
+    }
+    if (state.filters.genre_label) {
+      filterString += `, genre_in: ["${state.filters.genre_label}"]`;
+    }
+    if (state.filters.min_score) {
+      filterString += `, averageScore_greater: ${state.filters.min_score * 10}`;
     }
 
     const query = `

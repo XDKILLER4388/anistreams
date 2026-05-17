@@ -86,8 +86,40 @@ if ($method === 'GET') {
             $params[] = (int)$_GET['year'];
         }
         if (!empty($_GET['status'])) {
-            $where[] = 'status = ?';
-            $params[] = $_GET['status'];
+            $status = $_GET['status'];
+            if ($status === 'airing') {
+                $where[] = "status = 'Currently Airing'";
+            } elseif ($status === 'complete') {
+                $where[] = "status = 'Finished Airing'";
+            } elseif ($status === 'upcoming') {
+                $where[] = "status = 'Not yet aired'";
+            } else {
+                $where[] = 'status = ?';
+                $params[] = $status;
+            }
+        }
+        if (!empty($_GET['type'])) {
+            $type = $_GET['type'];
+            // Map to Jikan types (usually Title Case or UPPER)
+            $typeMap = [
+                'tv'      => 'TV',
+                'movie'   => 'Movie',
+                'ova'     => 'OVA',
+                'ona'     => 'ONA',
+                'special' => 'Special',
+                'music'   => 'Music'
+            ];
+            if (isset($typeMap[$type])) {
+                $where[] = 'type = ?';
+                $params[] = $typeMap[$type];
+            } else {
+                $where[] = 'type = ?';
+                $params[] = $type;
+            }
+        }
+        if (!empty($_GET['min_score'])) {
+            $where[] = 'score >= ?';
+            $params[] = (float)$_GET['min_score'];
         }
         if (!empty($_GET['letter'])) {
             $letter = $_GET['letter'];
