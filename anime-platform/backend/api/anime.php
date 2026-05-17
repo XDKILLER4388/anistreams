@@ -138,8 +138,35 @@ if ($method === 'GET') {
             $params[] = '%' . $q . '%';
         }
 
+        // Sorting
+        $sort = $_GET['sort'] ?? 'score';
+        $order = 'DESC';
+        $orderBy = 'score';
+
+        switch ($sort) {
+            case 'title':
+                $orderBy = 'title';
+                $order = 'ASC';
+                break;
+            case 'popularity':
+                // We don't have popularity, use score as fallback or episodes
+                $orderBy = 'score';
+                break;
+            case 'rank':
+                $orderBy = 'score';
+                break;
+            case 'start_date':
+                $orderBy = 'year';
+                break;
+            case 'episodes':
+                $orderBy = 'episodes';
+                break;
+            default:
+                $orderBy = 'score';
+        }
+
         $sql = 'SELECT * FROM anime WHERE ' . implode(' AND ', $where)
-             . ' ORDER BY score DESC LIMIT ? OFFSET ?';
+             . " ORDER BY $orderBy $order LIMIT ? OFFSET ?";
 
         $stmt = db()->prepare($sql);
         $i = 1;

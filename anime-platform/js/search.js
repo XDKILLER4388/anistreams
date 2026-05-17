@@ -170,21 +170,30 @@ window.removeFilter = (type) => {
 };
 
 // ── Build Jikan URL ───────────────────────────────────────────────────────────
+// ── Build Jikan URL ───────────────────────────────────────────────────────────
 function buildUrl() {
   const f = state.filters;
   const p = new URLSearchParams();
 
   p.set('limit', 24);
-  p.set('order_by', state.sort);
-  p.set('sort', state.sort === 'title' ? 'asc' : 'desc');
-  p.set('sfw', 'true');
   p.set('page', state.page);
 
+  // Map our sort to Jikan's order_by
+  const sortMap = {
+    score: 'score',
+    popularity: 'popularity',
+    rank: 'rank',
+    title: 'title',
+    start_date: 'start_date',
+    episodes: 'episodes'
+  };
+  
+  const orderBy = sortMap[state.sort] || 'score';
+  p.set('order_by', orderBy);
+  p.set('sort', state.sort === 'title' ? 'asc' : 'desc');
+
   if (state.query) {
-    // Check if query is Romaji (alphanumeric)
-    const isRomaji = /^[a-z0-9\s\-_',.?!&()]+$/i.test(state.query);
     p.set('q', state.query);
-    // For Romaji queries, sometimes Jikan works better without letter filter
   }
 
   if (f.type)       p.set('type', f.type);
@@ -215,6 +224,7 @@ async function doSearch() {
       q: state.query,
       page: state.page,
       limit: 24,
+      sort: state.sort,
       status: state.filters.status,
       type: state.filters.type,
       min_score: state.filters.min_score,
@@ -234,92 +244,109 @@ async function doSearch() {
     console.warn('Local DB search unavailable');
   }
 
-  // 2. Try AniList (Fast, robust search, supports Romaji/English/Native)
-  try {
-    const hasFilters = Object.keys(state.filters).length > 0;
-    const sortMap = { 
-      score: 'SCORE_DESC', 
-      popularity: 'POPULARITY_DESC', 
-      title: 'TITLE_ROMAJI_ASC', 
-      start_date: 'START_DATE_DESC' 
-    };
-    
-    const alSort = sortMap[state.sort] || 'SCORE_DESC';
-    const variables = { 
-      page: state.page, 
-      perPage: 24,
-      search: state.query || undefined,
-    };
-
-    // Build filter-specific query parts
-    let filterString = '';
-    if (state.filters.status) {
-      const statusMap = { airing: 'RELEASING', complete: 'FINISHED', upcoming: 'NOT_YET_RELEASED' };
-      if (statusMap[state.filters.status]) {
-        filterString += `, status: ${statusMap[state.filters.status]}`;
-      }
-    }
-    if (state.filters.year) {
-      filterString += `, seasonYear: ${state.filters.year}`;
-    }
-    if (state.filters.type) {
-      filterString += `, format: ${state.filters.type.toUpperCase()}`;
-    }
-    if (state.filters.genre_label) {
-      filterString += `, genre_in: ["${state.filters.genre_label}"]`;
-    }
-    if (state.filters.min_score) {
-      filterString += `, averageScore_greater: ${state.filters.min_score * 10}`;
-    }
-
-    const query = `
-      query ($page: Int, $perPage: Int, $search: String) {
-        Page(page: $page, perPage: $perPage) {
-          pageInfo { total lastPage }
-          media(search: $search, type: ANIME, sort: [${alSort}] ${filterString}, isAdult: false) {
-            id idMal title { romaji english native }
-            coverImage { extraLarge large }
-            episodes averageScore status format seasonYear
-          }
-        }
-      }`;
-
-    const r = await fetch('https://graphql.anilist.co', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, variables })
-    });
-
-    const d = await r.json();
-    const items = d.data?.Page?.media || [];
-
-    if (items.length) {
-      totalPages = Math.min(d.data?.Page?.pageInfo?.lastPage || 1, 50);
-      grid.innerHTML = items.map(a => renderCard({
-        mal_id: a.idMal,
-        title: a.title?.english || a.title?.romaji || a.title?.native,
-        images: { jpg: { large_image_url: a.coverImage?.extraLarge || a.coverImage?.large } },
-        score: a.averageScore ? (a.averageScore / 10).toFixed(1) : null,
-        episodes: a.episodes,
-        status: a.status,
-        type: a.format,
-        year: a.seasonYear
-      })).join('');
+  // If A-Z filter is active and local DB has nothing, skip AniList and go to Jikan 
+  // because AniList doesn't support "starts with" filter easily.
+  if (state.filters.letter && !state.query) {
+     // Skip AniList step
+  } else {
+    // 2. Try AniList (Fast, robust search, supports Romaji/English/Native)
+    try {
+      const sortMap = { 
+        score: 'SCORE_DESC', 
+        popularity: 'POPULARITY_DESC', 
+        title: 'TITLE_ROMAJI_ASC', 
+        start_date: 'START_DATE_DESC',
+        episodes: 'EPISODES_DESC'
+      };
       
-      const total = d.data?.Page?.pageInfo?.total || items.length;
-      if (resultsEl) resultsEl.textContent = `${total.toLocaleString()} results (Global)`;
-      renderPagination();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+      const alSort = sortMap[state.sort] || 'SCORE_DESC';
+      const variables = { 
+        page: state.page, 
+        perPage: 24,
+        search: state.query || undefined,
+      };
+
+      // Build filter-specific query parts
+      let filterString = '';
+      if (state.filters.status) {
+        const statusMap = { airing: 'RELEASING', complete: 'FINISHED', upcoming: 'NOT_YET_RELEASED' };
+        if (statusMap[state.filters.status]) {
+          filterString += `, status: ${statusMap[state.filters.status]}`;
+        }
+      }
+      if (state.filters.year) {
+        filterString += `, seasonYear: ${state.filters.year}`;
+      }
+      if (state.filters.type) {
+        filterString += `, format: ${state.filters.type.toUpperCase()}`;
+      }
+      if (state.filters.genre_label) {
+        filterString += `, genre_in: ["${state.filters.genre_label}"]`;
+      }
+      if (state.filters.min_score) {
+        filterString += `, averageScore_greater: ${state.filters.min_score * 10}`;
+      }
+
+      // If there's a search query, AniList sort might not work as expected
+      // We'll prioritize sort if there's no search query
+      const mediaArgs = [
+        'type: ANIME',
+        'isAdult: false',
+        `sort: [${alSort}]`,
+        state.query ? 'search: $search' : '',
+        filterString.startsWith(',') ? filterString.substring(1) : filterString
+      ].filter(Boolean).join(', ');
+
+      const query = `
+        query ($page: Int, $perPage: Int, ${state.query ? '$search: String' : ''}) {
+          Page(page: $page, perPage: $perPage) {
+            pageInfo { total lastPage }
+            media(${mediaArgs}) {
+              id idMal title { romaji english native }
+              coverImage { extraLarge large }
+              episodes averageScore status format seasonYear
+            }
+          }
+        }`;
+
+      const r = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables })
+      });
+
+      const d = await r.json();
+      const items = d.data?.Page?.media || [];
+
+      if (items.length) {
+        totalPages = Math.min(d.data?.Page?.pageInfo?.lastPage || 1, 50);
+        grid.innerHTML = items.map(a => renderCard({
+          mal_id: a.idMal,
+          title: a.title?.english || a.title?.romaji || a.title?.native,
+          images: { jpg: { large_image_url: a.coverImage?.extraLarge || a.coverImage?.large } },
+          score: a.averageScore ? (a.averageScore / 10).toFixed(1) : null,
+          episodes: a.episodes,
+          status: a.status,
+          type: a.format,
+          year: a.seasonYear
+        })).join('');
+        
+        const total = d.data?.Page?.pageInfo?.total || items.length;
+        if (resultsEl) resultsEl.textContent = `${total.toLocaleString()} results (Global)`;
+        renderPagination();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    } catch (e) {
+      console.error('AniList search failed:', e);
     }
-  } catch (e) {
-    console.error('AniList search failed:', e);
   }
 
   // 3. Last Resort: Jikan (MAL) with retry logic
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch(buildUrl());
+      const url = buildUrl();
+      const res = await fetch(url);
       if (res.status === 429) {
         await new Promise(r => setTimeout(r, 1500));
         continue;
@@ -334,7 +361,9 @@ async function doSearch() {
         renderPagination();
         return;
       }
-    } catch {}
+    } catch (e) {
+      console.error('Jikan search failed:', e);
+    }
   }
 
   // If all failed or no results found anywhere
