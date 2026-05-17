@@ -1,0 +1,8 @@
+node_modules/
+*.log
+.env
+backend/config.php
+anistream_backup.sql
+write-watch-output.txt
+.kiro/
+.vscode/
