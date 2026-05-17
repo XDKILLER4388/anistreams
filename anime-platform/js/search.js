@@ -41,10 +41,6 @@ function normalizeDbAnime(row) {
 
 // ── Local DB helpers ──────────────────────────────────────────────────────────
 async function dbGetAnimeList(params = {}) {
-  // Skip DB calls on Cloudflare/static hosting — only works with PHP backend
-  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
-    return null;
-  }
   const p = new URLSearchParams(params);
   try {
     const res = await fetch(`backend/api/anime.php?${p}`);
@@ -213,33 +209,31 @@ async function doSearch() {
   renderSkeletons(24, grid);
   if (resultsEl) resultsEl.textContent = 'Searching...';
 
-  const hasFilters = Object.keys(state.filters).length > 0;
-
-  // 1. Try Local DB first if on localhost
-  if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
-    try {
-      const dbParams = {
-        q: state.query,
-        page: state.page,
-        limit: 24,
-        status: state.filters.status,
-        year: state.filters.year,
-        genre: state.filters.genre_label // Local DB expects genre name
-      };
-      const dbRes = await dbGetAnimeList(dbParams);
-      if (dbRes?.data?.length) {
-        totalPages = Math.ceil((dbRes.pagination?.total || dbRes.data.length) / 24);
-        grid.innerHTML = dbRes.data.map(a => renderCard(normalizeDbAnime(a))).join('');
-        if (resultsEl) resultsEl.textContent = `${(dbRes.pagination?.total || dbRes.data.length).toLocaleString()} results (Local)`;
-        renderPagination();
-        return;
-      }
-    } catch (e) {
-      console.warn('Local DB search failed, falling back to Jikan:', e);
+  // 1. Try Local DB first
+  try {
+    const dbParams = {
+      q: state.query,
+      page: state.page,
+      limit: 24,
+      status: state.filters.status,
+      year: state.filters.year,
+      letter: state.filters.letter,
+      genre: state.filters.genre_label
+    };
+    const dbRes = await dbGetAnimeList(dbParams);
+    if (dbRes?.data?.length) {
+      totalPages = Math.ceil((dbRes.pagination?.total || dbRes.data.length) / 24);
+      grid.innerHTML = dbRes.data.map(a => renderCard(normalizeDbAnime(a))).join('');
+      if (resultsEl) resultsEl.textContent = `${(dbRes.pagination?.total || dbRes.data.length).toLocaleString()} results (Local)`;
+      renderPagination();
+      return;
     }
+  } catch (e) {
+    console.warn('Local DB search unavailable, using remote APIs');
   }
 
-  // 2. Fallback to AniList for initial load or if query matches
+  // 2. Fallback to remote APIs
+  const hasFilters = Object.keys(state.filters).length > 0;
   if (!state.query && !hasFilters) {
     try {
       const sortMap = { score: 'SCORE_DESC', popularity: 'POPULARITY_DESC', title: 'TITLE_ROMAJI_ASC', start_date: 'START_DATE_DESC' };

@@ -89,6 +89,15 @@ if ($method === 'GET') {
             $where[] = 'status = ?';
             $params[] = $_GET['status'];
         }
+        if (!empty($_GET['letter'])) {
+            $letter = $_GET['letter'];
+            if ($letter === '0' || $letter === '#') {
+                $where[] = "title REGEXP '^[0-9]'";
+            } else {
+                $where[] = 'title LIKE ?';
+                $params[] = $letter . '%';
+            }
+        }
         if (!empty($_GET['q'])) {
             $q = $_GET['q'];
             $where[] = '(title LIKE ? OR title_jp LIKE ? OR synopsis LIKE ?)';
