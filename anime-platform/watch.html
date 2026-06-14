@@ -246,7 +246,7 @@ async function boot(){
 }
 
 function mkIframe(src){
-  return '<iframe src="'+src+'" allowfullscreen allow="autoplay;fullscreen;picture-in-picture;encrypted-media" style="width:100%;height:100%;border:none;display:block" loading="eager"></iframe>';
+  return '<iframe src="'+src+'" allowfullscreen allow="autoplay;fullscreen;picture-in-picture;encrypted-media" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-fullscreen allow-pointer-lock" style="width:100%;height:100%;border:none;display:block" loading="eager"></iframe>';
 }
 function renderEmbed(ep,idx){var w=document.getElementById('video-player');if(!w)return;var ps=providers(animeId,ep,alId);w.innerHTML=mkIframe(ps[idx].u);badge('&#9654; '+ps[idx].n,'#4ade80');}
 function renderBtns(ep,ai){
