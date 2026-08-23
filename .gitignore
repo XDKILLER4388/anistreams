@@ -6,3 +6,9 @@ anistream_backup.sql
 write-watch-output.txt
 .kiro/
 .vscode/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
